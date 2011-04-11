@@ -3,9 +3,19 @@
 <head>
 	<meta charset="utf-8" />
 	<title>Skeleton F application</title>
+	<script type="text/javascript" src="LAB.min.js"></script>
+	<script type="text/javascript">
+	$LAB
+	.script('/nowjs/now.js')
+	.script('underscore.js')
+	.script('jquery-1.5.2.min.js').wait()
+	.script('jquery.tmpl.min.js')
+	.script('backbone.js').wait(function(){
+		console.log('ALLSWELL', $, $.tmpl, _, Backbone);
+	});
+	</script>
 </head>
 <body>
 	<%-body%>
-	<script src="/nowjs/now.js"></script>
 </body>
 </html>
