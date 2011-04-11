@@ -1,0 +1,42 @@
+<h1>Please, authenticate</h1>
+<!-- native signin -->
+<form method="post">
+	<div>
+		<p>ID</p>
+		<p><input type="text" name="id" /></p>
+		<p>Password</p>
+		<p><input type="password" name="password" /></p>
+		<p><input type="submit" name="signin" value="Sign In" /></p>
+	</div>
+</form>
+<!-- native signup -->
+<% if (signup) { %>
+<form method="post">
+	<div>
+		<p>ID</p>
+		<p><input type="text" name="id" /></p>
+		<p>E-mail</p>
+		<p><input type="email" name="email" /></p>
+		<p>Password</p>
+		<p><input type="password" name="password" /></p>
+		<p>Confirm password</p>
+		<p><input type="password" name="password2" /></p>
+		<p>We signup only humans</p>
+		<p><img src="aaa" /></p>
+		<p><input type="text" name="captcha" /></p>
+		<p><input type="submit" name="signup" value="Sign Up" /></p>
+	</div>
+</form>
+<% } %>
+<!-- janrain.com -->
+<% if (janrain) { %>
+<div>
+	<iframe src="https://<%-janrain.domain%>.rpxnow.com/openid/embed?language_preference=en&token_url=<%-tokenUrl%>" style="width:400px;height:240px;" scrolling="no" frameborder="no"></iframe>
+</div>
+<% } %>
+<!-- loginza.ru -->
+<% if (loginza) { %>
+<div>
+	<iframe src="https://loginza.ru/api/widget?overlay=loginza&lang=en&token_url=<%-tokenUrl%>" style="width:359px;height:300px;" scrolling="no" frameborder="no"></iframe>
+</div>
+<% } %>

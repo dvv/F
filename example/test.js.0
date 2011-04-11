@@ -1,0 +1,177 @@
+'use strict';
+
+/*
+ *
+ * Copyright(c) 2011 Vladimir Dronnikov <dronnikov@gmail.com>
+ * MIT Licensed
+ *
+*/
+
+////////////////////////////////////////////////////////////
+
+var F = require('./');
+
+////////////////////////////////////////////////////////////
+
+//
+// setup application
+//
+var config = require('./config');
+Next({}, function(err, result, next) {
+
+	//
+	// get the data model
+	//
+	require('./model')(config, next);
+
+}, function(err, model, next) {
+
+	if (err) console.log('S1', err.stack);
+
+	//
+	// setup middleware
+	//
+	deepCopy({
+		// signup function
+		signup: config.security.selfSignup ? model.signup : undefined,
+		// get capability
+		getCapability: this.getCapability = model.getCapability,
+		// native authentication
+		checkCredentials: model.checkCredentials
+	}, config.security);
+	// custom routes
+	config.routes = [
+		['GET', '/admin', function(req, res, next) {
+			res.render('admin', res.context);
+		}],
+	];
+	// generate middleware
+	var middleware = F.vanilla(__dirname, config);
+	next(null, middleware);
+
+}, function(err, middleware, next) {
+
+	if (err) console.log('S2', err.stack);
+
+	//
+	// run both HTTP(S) servers with the same middleware
+	//
+	var http = require('http').createServer();
+	http.on('request', middleware);
+	http.listen(3000);
+	//require('./now')(http);
+
+	// TODO: make this lib/websocket standard
+
+	var everyone = require('now').initialize(http);
+	everyone.connected(function() {
+		// TODO: lookup sid cookie, auto-call setContext if found
+		//console.log("Joined: " + this.now.name);
+	});
+	everyone.disconnected(function() {
+		//console.log("Left: " + this.now.name);
+	});
+
+	var getCapability = this.getCapability;
+	var Cookie = require('cookie-sessions');
+	everyone.now.getContext = function getContext(sid, callback) {
+		// parse auth cookie to get the current user
+		// TODO: better to get them from the request, if any exposed
+		var options = config.security.session;
+		var session;
+		try {
+			session = Cookie.deserialize(options.secret, options.timeout, sid);
+		} catch (err) {}
+		// push capabilities to the client
+		var that = this;
+		var client = this.now;
+		if (session && session.uid) {
+			getCapability(session.uid, function(err, result) {
+				//console.log('CTX', arguments);
+				var schema = {};
+				// bind caps to the user context
+				_.each(result, function(obj, name) {
+					var x = _.clone(obj);
+					_.each(_.functions(x), function(f) { x[f] = x[f].bind(null, result); });
+					schema[name] = x.schema; delete x.schema;
+					result[name] = x;
+				});
+				// push to the client the sanitized user profile
+				client.user = {
+					id: result.user.id,
+					name: result.user.name,
+					email: result.user.email,
+					roles: result.user.roles
+				};
+				// push to the client the user context
+				client.context = result;
+				// push profile stuff
+				client.getProfile = function(callback) {
+					//var id = result.user.id;
+					result.Self.getProfile(function(err, result) {
+						if (callback) callback(err, result);
+					});
+				};
+				client.setProfile = function(changes, callback) {
+					var id = result.user.id;
+					result.Self.setProfile(changes, function(err) {
+						if (err && callback) return callback({error: err});
+						getContext.call(that, sid, callback);
+					});
+				};
+				// return db schema
+				if (callback) callback({schema: schema});
+			});
+		// invalid user, or just signed out 
+		} else {
+			// revoke capabilities from the client
+			client.user = {};
+			client.context = {};
+			client.getProfile = client.setProfile = false;
+			if (callback) callback({});
+		}
+	};
+
+	everyone.now.distributeMessage = function(message) {
+		everyone.now.receiveMessage(this.now.name, message);
+	};
+
+	/*
+	var https = require('https').createServer({
+		key: require('fs').readFileSync('key.pem', 'utf8'),
+		cert: require('fs').readFileSync('cert.pem', 'utf8')
+	});
+	https.on('request', middleware);
+	https.listen(4000);
+	*/
+	return;
+
+	//
+	// run cluster
+	//
+	var server = require('stereo')(null, config.server);
+
+	//
+	// worker process
+	//
+	if (server) {
+
+		// inter-workers message arrives
+		process.on('message', function(message){
+			process.log(JSON.stringify(message));
+		});
+
+		// attach middleware
+		server.on('request', middleware);
+
+	//
+	// master process
+	//
+	} else {
+
+		// broadcast a message
+		setTimeout(function(){process.publish({sos: 'to all, all, all'});}, 2000);
+
+	}
+
+});

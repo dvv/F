@@ -1,0 +1,35 @@
+<header id="header">
+	<a href="/auth" data-bind="visible: !user.id">Sign In</a>
+	<form action="/auth" method="post" data-bind="visible: user.id"><input type="submit" value="Sign Out" /></form>
+
+</header>
+<div id="content">
+
+	<div id="error"></div>
+	<div id="entity"></div>
+
+<div id="dashboard" data-bind="visible: user.id">
+Hi, <span data-bind="text: (user.name || user.email || user.id || 'Guest')"></span>!
+Profile
+<div id="profile"></div>
+<div id="menu"></div>
+</div>
+
+<script id="tmpl-menu" type="text/html">
+<a href="#list/<%=entity%>"><%=entity%></a>&nbsp;
+</script>
+
+<script id="tmpl-error" type="text/html">
+<%= error ? JSON.stringify(error) : '' %>
+</script>
+
+<script id="tmpl-profile" type="text/html">
+ID: <%= user.id %>
+Name: <%= user.name %>
+E-mail: <%= user.email %>
+</script>
+
+</div>
+<footer id="footer">
+
+</footer>

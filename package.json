@@ -1,0 +1,21 @@
+{
+  "name"          : "F",
+  "description"   : "Simple middleware",
+  "url"           : "https://github.com/dvv/F/",
+  "keywords"      : ["middleware", "json", "schema", "underscore", "javascript", "mongodb", "rql"],
+  "author"        : "Vladimir Dronnikov <dronnikov@gmail.com>",
+  "contributors"  : [],
+  "dependencies"  : {
+    "underscore-data": "",
+    "simple-mime": "",
+    "cookie-sessions": "",
+    "qs": "",
+    "formidable": "",
+    "mongodb": "",
+    "emailjs": "",
+    "now": ""
+  },
+  "lib"           : ".",
+  "main"          : "index.js",
+  "version"       : "0.0.3"
+}
