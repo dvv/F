@@ -28,13 +28,17 @@ var templateSettings = {
 	//interpolate : /<%=([\s\S]+?)%>/g,
 	//escape			: /<%!([\s\S]+?)%>/g,
 	// ejs
-	evaluate		: /<%([\s\S]+?)%>/g,
-	interpolate : /<%-([\s\S]+?)%>/g,
-	escape			: /<%=([\s\S]+?)%>/g,
-	// mustache?
+	//evaluate		: /<%([\s\S]+?)%>/g,
+	//interpolate : /<%-([\s\S]+?)%>/g,
+	//escape			: /<%=([\s\S]+?)%>/g,
+	// mustache-like
 	//evaluate: /\{\{([\s\S]+?)\}\}/g,
 	//interpolate: /\$\$\{([\s\S]+?)\}/g,
 	//escape: /\$\{([\s\S]+?)\}/g,
+	// php
+	evaluate: /<\?([\s\S]+?)\?>/g,
+	interpolate: /<\?-([\s\S]+?)\?>/g,
+	escape: /<\?=([\s\S]+?)\?>/g,
 };
 
 // template parser
@@ -59,7 +63,14 @@ function template(str, data, settings) {
 		.replace(/\t/g, '\\t')
 		+ "');}return __p.join('');";
 	//console.log('\n\n\n' + tmpl + '\n\n\n');
-	var func = new Function('obj', tmpl);
+	var func;
+	try {
+		func = new Function('obj', tmpl);
+	} catch (err) {
+		func = function() {
+			return err.stack || err.message;
+		}
+	}
 	return data ? func(data) : func;
 }
 
@@ -95,7 +106,7 @@ module.exports = function setup(options) {
 	Http.ServerResponse.prototype.render = function(name, vars, callback) {
 		var self = this;
 		self.partial(name, vars, function(errBody, body) {
-			self.partial('layout', extend({}, vars, {body: body}), function(err, result) {
+			self.partial('layout', _.extend({}, vars, {body: body}), function(err, result) {
 				//console.log('RES.RENDER', arguments);
 				if (callback) {
 					callback(err, result);
@@ -120,7 +131,11 @@ module.exports = function setup(options) {
 			Fs.readFile(filename, function(err, text) {
 				if (err) return callback(err.errno === ENOENT ? null : err, null);
 				cache[name] = template(text.toString('utf8'));
-				callback(null, cache[name](vars));
+				//try {
+					callback(null, cache[name](vars));
+				//} catch (err) {
+				//	callback(err);
+				//}
 			});
 		}
 	}

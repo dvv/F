@@ -50,7 +50,7 @@ var Middleware = function Stack(/*layers*/) {
 //
 // plugin middleware helpers
 //
-extend(Middleware, {
+_.extend(Middleware, {
 
 	// fill req.context with current user capability
 	caps: require('./caps'),

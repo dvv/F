@@ -5,7 +5,7 @@ module.exports = function(db) {
 //
 // generic testing entity
 //
-var Foo = {
+return {
 	type: 'object',
 	additionalProperties: false,
 	properties: {
@@ -27,13 +27,6 @@ var Foo = {
 			}
 		}
 	}
-};
-
-//
-// expose entities
-//
-return {
-	Foo: Foo
 };
 
 };

@@ -9,6 +9,7 @@
 
 ////////////////////////////////////////////////////////////
 
+var config = require('./config');
 var F = require('../');
 
 ////////////////////////////////////////////////////////////
@@ -16,13 +17,13 @@ var F = require('../');
 //
 // setup application
 //
-var config = require('./config');
 Next({}, function(err, result, next) {
 
 	//
 	// get the data model
 	//
-	require('./model')(config, next);
+	config.model = __dirname + '/model';
+	F.model(config, next);
 
 }, function(err, model, next) {
 
@@ -30,17 +31,16 @@ Next({}, function(err, result, next) {
 	//console.log('MODEL', model);
 
 	//
-	// setup middleware
-	//
 	// augment security options to handle authentication
-	deepCopy({
-		// signup function
-		signup: config.security.selfSignup ? model.signup : undefined,
-		// get capability
-		getCapability: this.getCapability = model.getCapability,
-		// native authentication
-		checkCredentials: model.checkCredentials
-	}, config.security);
+	//
+	// signup function
+	if (config.security.selfSignup) {
+		config.security.signup = model.signup;
+	}
+	// get capability
+	config.security.getCapability = model.getCapability;
+	// native authentication
+	config.security.checkCredentials = model.checkCredentials;
 	// custom routes
 	config.routes = [
 		['GET', '/', function(req, res, next) {
@@ -48,8 +48,10 @@ Next({}, function(err, result, next) {
 			res.render('index', req.context);
 		}],
 	];
-	// generate middleware
-	var middleware = F.vanilla(__dirname, config);
+	//
+	// setup middleware
+	//
+	var middleware = F.stack.vanilla(__dirname, config);
 	next(null, middleware);
 
 }, function(err, middleware, next) {
@@ -60,7 +62,13 @@ Next({}, function(err, result, next) {
 	//
 	// setup now.js
 	//
-	var nowjs = require('../lib/now')(this.getCapability, config);
+	var nowjs = F.now(config.security.getCapability, config);
+	//
+	/*extend(nowjs.client, {
+		act: function(s) {
+			this.now.flash(s);
+		}
+	});*/
 
 	//
 	// run HTTP server
@@ -79,8 +87,13 @@ Next({}, function(err, result, next) {
 		now_http.disconnected(function() {
 			//console.log("Left: " + this.now);
 		});
-		extend(now_http.now, nowjs.client);
+		_.extend(now_http.now, nowjs.client);
 	}
+	_.extend(now_http.now, {
+		act: function(s) {
+			this.now.flash(s);
+		}
+	});
 
 	//
 	// reuse the middleware for HTTPS server
@@ -97,7 +110,7 @@ Next({}, function(err, result, next) {
 		now_https.now.demo = function(callback) {
 			console.log('DEMOHTTPS');
 		}
-		extend(now_https.now, nowjs.client);
+		_.extend(now_https.now, nowjs.client);
 	}
 
 });

@@ -118,7 +118,7 @@ Http.ServerResponse.prototype.send = function(body, headers, status) {
 		}
 	}
 	// merge headers
-	extend(this.headers, headers);
+	_.extend(this.headers, headers);
 	// finalize the response
 	this.writeHead(status || 200, this.headers);
 	return this.end(body);

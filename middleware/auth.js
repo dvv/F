@@ -62,14 +62,14 @@ module.exports.form = function setup(mount, options) {
 		// GET -- render authentication page
 		//
 		if (req.method === 'GET') {
-			// FIXME: render means express?
 			res.render('auth', {
 				janrain: options.janrain ? {
 					domain: options.janrain.domain
 				} : undefined,
 				loginza: options.loginza,
 				tokenUrl: encodeURI(options.signinURL),
-				signup: Boolean(options.signup)
+				signup: Boolean(options.signup),
+				captcha: res.captcha.bind(res)
 			});
 			return;
 		}
