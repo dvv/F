@@ -23,10 +23,12 @@ if (typeof console == 'undefined') console = {log: alert};
 //
 _.mixin({
 	partial: function(name, data) {
-		var tmpl = $(name).html() || '';
-		var result = eco(tmpl);
-		if (data) result = result(data);
-		return result;
+		return name;
+		return $.jqote(name, data);
+	},
+	compile: function(name) {
+		return function(){return name};
+		return $.jqotec(name);
 	},
 	// i18n helper
 	T: function(str) {
@@ -82,7 +84,7 @@ var ChromeModel = Backbone.Model.extend({
 		var model = this;
 		var view = Backbone.View.extend({
 			el: $('#'+id),
-			template: _.partial('#tmpl-'+id+',#tmpl-missing'),
+			template: _.compile('#tmpl-'+id+',#tmpl-missing'),
 			initialize: function() {
 				_.bindAll(this, 'render');
 				model.bind('change:'+attr, this.render);

@@ -35,11 +35,14 @@
 	<script type="text/javascript">
 		$LAB
 		.script('js/modernizr-1.7.min.js')
-		.script('http://jashkenas.github.com/coffee-script/extras/coffee-script.js').wait()
-		.script('http://sstephenson.github.com/eco/dist/eco.js')
+		//.script('http://jashkenas.github.com/coffee-script/extras/coffee-script.js').wait()
+		//.script('http://sstephenson.github.com/eco/dist/eco.js')
 		.script('/nowjs/now.js')
 		.script('js/jquery-1.5.2.min.js').wait()
-		.script('js/jquery.tmpl.min.js')
+		//.script('js/jquery.tmpl.min.js')
+		//.script('js/jquery.jqote2.js')
+		//.script('js/pure.js')
+		.script('js/weld.js')
 		.script('js/underscore.js')
 		.script('js/backbone.js').wait()
 		.script('growl/growl.js')
@@ -64,7 +67,7 @@
 		</script>
 	<![endif]-->
 
-<script id="tmpl-missing" type="text/x-jquery-tmpl">MISSING-TEMPLATE</script>
+<script id="tmpl-missing" type="text/x-jquery-tmpl">MISSING-TEMPLATE-<%=name%></script>
 
 </body>
 </html>

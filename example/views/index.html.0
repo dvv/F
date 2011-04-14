@@ -15,12 +15,7 @@
 <div id="content">
 
 <!--div id="error"></div-->
-<div id="profile1">
-ID: <a class="id uuu"></a>
-E-mail: <span class="email"></span>
-Name: <span class="name"></span>
-Roles: <ul class1="roles"><li class="list"></li></ul>
-</div>
+<div id="profile"></div>
 <div id="menu"></div>
 <div id="list"></div>
 
@@ -31,19 +26,19 @@ Roles: <ul class1="roles"><li class="list"></li></ul>
 
 </footer>
 
-<script id="tmpl-errors" type="text/x-jquery-tmpl"><![CDATA[
-<% _.each(objfor err in @: %>
+<script id="tmpl-errors" type="text/x-jquery-tmpl">
+<% for err in @: %>
 ERR: <%=err.message%>
 <% end %>
-]]></script>
+</script>
 
 <script id="tmpl-profile" type="text/x-jquery-tmpl">
-ID: <%=this.user.id%>
-E-mail: <%=this.user.email%>
-Name: <%=this.user.name%>
-<% _.each(this.user.roles, function(role){%>
-Role: <%=role%><br/>
-<%});%>
+ID: <%= @user.id %>
+E-mail: <%= @user.email %>
+Name: <%= @user.name %>
+<% for role in @user.roles: %>
+Role: <%= role %><br/>
+<% end %>
 </script>
 
 <script id="tmpl-menu" type="text/x-jquery-tmpl">
