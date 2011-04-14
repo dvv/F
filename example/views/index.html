@@ -15,12 +15,7 @@
 <div id="content">
 
 <!--div id="error"></div-->
-<div id="profile1">
-ID: <a class="id uuu"></a>
-E-mail: <span class="email"></span>
-Name: <span class="name"></span>
-Roles: <ul class1="roles"><li class="list"></li></ul>
-</div>
+<div id="profile"></div>
 <div id="menu"></div>
 <div id="list"></div>
 
@@ -31,25 +26,23 @@ Roles: <ul class1="roles"><li class="list"></li></ul>
 
 </footer>
 
-<script id="tmpl-errors" type="text/x-jquery-tmpl"><![CDATA[
-<% _.each(objfor err in @: %>
-ERR: <%=err.message%>
-<% end %>
-]]></script>
+<script id="tmpl-errors" type="text/x-jquery-tmpl">
+{{#}}
+ERR: {{message}}
+{{/}}
+</script>
 
 <script id="tmpl-profile" type="text/x-jquery-tmpl">
-ID: <%=this.user.id%>
-E-mail: <%=this.user.email%>
-Name: <%=this.user.name%>
-<% _.each(this.user.roles, function(role){%>
-Role: <%=role%><br/>
-<%});%>
+ID: <a class="id">{{id}}</a>
+E-mail: <span class="email">{{email}}</span>
+Name: <span class="name">{{name}}</span>
+Roles: <ul class1="roles">{{#roles}}<li class="list">{{.|raw}}</li>{{/roles}}</ul>
 </script>
 
 <script id="tmpl-menu" type="text/x-jquery-tmpl">
-<% for role in @: %>
-<a href="#list/<%=role%>"><%=role%></a>&nbsp;
-<% end %>
+{{#}}
+<a href="#list/{{.}}">{{.}}</a>&nbsp;
+{{/}}
 </script>
 
 <script id="tmpl-list111" type="text/x-jquery-tmpl">
@@ -59,80 +52,11 @@ ${ JSON.stringify($value) }
 </script>
 
 <script id="tmpl-list" type="text/x-jquery-tmpl">
-<div class="list-actions grid_3 alpha"><%- _.partial('#tmpl-Admin-actions,#tmpl-actions,#tmpl-missing', @) %></div>
-<div class="list grid_13 omega">
-	<% if @actions.update or @actions.remove: %>
-	<select class="actions">
-		<option></option>
-		<option value="all"><%= _.T('all') %></option>
-		<option value="none"><%= _.T('none') %></option>
-		<option value="toggle"><%= _.T('toggle') %></option>
-	</select>
-	<div id="inspector" class="list-item-inspector"></div>
-	<% end %>
-	<table id="list-<%= @entity %>">
-		<thead>
-			<tr>
-				<th></th>
-				<% for k, v of @props.properties: %>
-				<th class="action-sort" rel="<%= k %>"><%= _.T(k) %></th>
-				<% end %>
-			</tr>
-			<tr>
-				<th><% if @actions.update or @actions.remove: %><input type="checkbox" class="action-select-all" /><% end %></th>
-				<% for name, prop of @props: %>
-				<th>
-					<% if prop.type is 'boolean': %>
-					<select name="<%= name %>" type="search" data-type="<%= prop.type %>" class="filter">
-						<option value=""></option>
-						<option value="true"<% if @query.last?[name] and @query.last[name].args[1] is true: %> selected="selected"<% end %>>Да</option>
-						<option value="false"<% if @query.last?[name] and @query.last[name].args[1] is false: %> selected="selected"<% end %>>Нет</option>
-					</select>
-					<% else: %>
-					<input type="search" name="<%=name%>" data-type="<%=prop.type%>" class="filter"<% if @query.last?[name]: %> value="<%=@query.last[name].args[1]%>"<% end %> />
-					<% end %>
-				</th>
-				<% end %>
-			</tr>
-		</thead>
-		<tbody class="action-select-list">
-		<% for item in @items: %>
-			<tr class="action-select-row<% if ~@selected.indexOf(item.id): %> selected<% end %>" rel="<%=item.id%>">
-				<td class="actions"><% if @actions.update or @actions.remove: %><input type="checkbox" class="action-select" <% if ~@selected.indexOf(item.id): %>checked="checked"<% end %> /><% end %></td>
-				<% for name, prop of @props: >
-				<% val = item[name] %>
-				<% if prop.type is 'date' then val = (new Date(val)).toLocaleString() %>
-				<td>
-				<% if name is 'id': %>
-					<a class="action-open" rel="<%=id%>" href="#<%=name%>/<%=id%>"><%=val%></a>
-				<% else: %>
-					<%=val%>
-				<% end %>
-				</td>
-				<% end %>
-			</tr>
-		<% end %>
-		</tbody>
-		<tfoot></tfoot>
-	</table>
-	<% if @items.length: %>
-	<p><%= _.T('displayingItems', +@query.limit[1]+1, +@query.limit[1]+@items.length) %></p>
-	<% else: %>
-	<p><%= _.T('displayingNone') %></p>
-	<% end %>
-	<div class="pager">
-		<% if @query.limit[1]: %>
-		<a href="#" class="page-prev"><%= _.T('prev') %></a>
-		<% end %>
-		<% if @items.length >= @query.limit[0]: %>
-		<a href="#" class="page-next"><%= _.T('next') %></a>
-		<% end %>
-		<select class="action-limit">
-			<option value="<%= @query.limit[0] %>"><%= @query.limit[0] %></option>
-			<option value="10">10</option>
-			<option value="25">25</option>
-			<option value="50">50</option>
-		</select>
-	</div>
-</div>
+<div class="list-actions grid_3 alpha">{{#partials}}{{actions|raw}}{{/}}</div>
+</script>
+
+<script id="tmpl-Admin-actions" type="text/x-kite">
+ACTS
+{{JSON.stringify(context)}}
+/ACTS
 </script>

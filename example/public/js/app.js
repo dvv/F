@@ -23,12 +23,11 @@ if (typeof console == 'undefined') console = {log: alert};
 //
 _.mixin({
 	partial: function(name, data) {
-		return name;
-		return $.jqote(name, data);
+		console.log('PART', name, data);
+		return kite($(name).html()||'', data);
 	},
 	compile: function(name) {
-		return function(){return name};
-		return $.jqotec(name);
+		return kite($(name).html()||'');
 	},
 	// i18n helper
 	T: function(str) {
@@ -92,7 +91,8 @@ var ChromeModel = Backbone.Model.extend({
 			render: function() {
 				var data = model.toJSON();
 				if (getter) data = getter.call(model, data);
-				this.el.html(this.template(data));
+				//this.el.html(this.template(data));
+				this.el.html(_.partial('#tmpl-'+id+',#tmpl-missing', data));
 				return this;
 			}
 		});
@@ -139,7 +139,7 @@ var ViewList = model.getViewForAttribute('result', 'list', function(data) {
 		type: 'object', properties: {id: {}}
 	};
 	//console.log('A', entity, context[entity], props);
-	return {
+	var context = {
 		entity: entity,
 		actions: _.reduce(context[entity], function(acc, v, k) {acc[k] = !!v; return acc;}, {}),
 		items: data.result || [],
@@ -147,8 +147,12 @@ var ViewList = model.getViewForAttribute('result', 'list', function(data) {
 		query: {
 			limit: []
 		},
-		selected: []
+		selected: [],
+		partials: {
+			actions: _.partial('#tmpl-'+entity+'-actions,#tmpl-actions', context)
+		}
 	};
+	return context;
 });
 
 //
