@@ -91,4 +91,4 @@
       return this._growlContainer;
     }
   };
-})(jQuery);
+})($);

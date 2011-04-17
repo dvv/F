@@ -22,17 +22,6 @@ if (typeof console == 'undefined') console = {log: alert};
 // misc helpers
 //
 
-// pop a notification
-function flash(s) {
-	$.Growl.show(s, {
-		icon: false,
-		title: false,
-		cls: '',
-		speed: 1000,
-		timeout: 50000
-	});
-}
-
 // Escape special HTML entities
 function escapeHTML(x) {
 	return (x == null) ? '' :
@@ -156,53 +145,19 @@ var ChromeModel = Backbone.Model.extend({
 	// setup RPC helper
 	rpc: function(entity, method, callback /*, params */) {
 		var self = this;
-		// memorize the entity
 		self.set({entity: entity});
-		// extract params
 		var params = Array.prototype.slice.call(arguments, 3);
-		// extract handler
-		var handler = self.get('context')[entity][method];
+		params.push(function(err, result) {
+			//console.log('RET', err, result);
+			self.set({error: err||null, result: err ? null : (result||null)});
+			if (callback) callback();
+		});
 		try {
-			// handler is function?
-			if (typeof handler === 'function') {
-				// now.js case
-				// great RPC -- RPC by namely call the remote function
-				params.push(function(error, result) {
-					//console.log('RET', err, result);
-					self.set({error: error||null, result: error ? null : (result||null)});
-					if (callback) callback();
-				});
-				handler.apply(null, params);
-			// handler is exposed
-			} else if (handler === true) {
-				// fallback to vanilla JSON-RPC via XHR
-				$.ajax({
-					method: 'POST',
-					type: 'json',
-					url: entity,
-					data: JSON.stringify({jsonrpc: '2.0', method: method, params: params}),
-					headers: {'Content-Type': 'application/json; charset=UTF-8'},
-					success: function(response) {
-						//console.log('SUCCESS', arguments);
-						self.set({error: response.error||null, result: response.error ? null : (response.result||null)});
-					},
-					error: function() {
-						//console.log('ERROR', arguments);
-						// communication failed
-						self.set({error: 'failed', result: null});
-					},
-					complete: function() {
-						//console.log('COMPLETE', arguments);
-					}
-				});
-			// no handler for this RPC
-			} else {
-				self.set({error: 'notsupported', result: null});
-			}
+			self.get('context')[entity][method].apply(null, params);
 		} catch (err) {
 			//console.log('ERR', err);
 			if (err instanceof TypeError) {
-				err = 'notsupported';
+				err = 'Forbidden';
 			} else {
 				err = err.message || err;
 			}
@@ -346,38 +301,9 @@ var Controller = Backbone.Controller.extend({
 //
 $.domReady(function() {
 	console.log('DOMREADY');
-	//
-	// instantiate UI
-	//
-	new ViewError();
-	new ViewMenu();
-	new ViewUser();
-	new ViewList();
-	//
-	// update model, to cause initial render
-	//
-	model.set({
-		user: context.user,
-		context: context.caps, // user caps
-		schema: context.schema,
-		entity: null,
-		error: null,
-		//result: null
-	});
-	//
-	// run application
-	//
-	new Controller();
-	console.log('STARTING!');
-	Backbone.history.start();
 });
-
-/*
 function ready() {
 	console.log('READY');
-	//
-	// try to upgrade context to now.js
-	//
 	//
 	// N.B. we rely on server-side logic which sets secure signed cookie called sid which holds the session
 	// ugly hack -- we fetch the sid cookie and pass it as parameter to `getContext` to get the user context
@@ -385,7 +311,8 @@ function ready() {
 	//
 	var sid = document.cookie.match(new RegExp('(?:^|;) *' + 'sid' + '=([^;]*)')); sid = sid && sid[1] || '';
 	// establish nowjs connection
-	if (false) now.ready(function() {
+	//if (false)
+	now.ready(function() {
 		// connection established ok
 		console.error('NOWREADY');
 		// disconnect nullifies context
@@ -395,16 +322,43 @@ function ready() {
 			// TODO: display reconnect link
 		});
 		// given sid, server should set now.context which holds the user capabilities
+		var operaJSSucks = false;
 		now.getContext(sid, function(response) {
-			console.log('GOT CONTEXT', response, now.context);
-			model.set({context: now.context});
-			// FIXME: should emit change event, to rerender
+			if (operaJSSucks) return;
+			operaJSSucks = true;
+      console.log('GOT CONTEXT', response);
+			//
+			// instantiate UI
+			//
+			new ViewError();
+			new ViewMenu();
+			new ViewUser();
+			new ViewList();
+			// update model, to cause initial render
+			model.set({
+				user: response.user,
+				context: now.context, // user caps
+				schema: response.schema,
+				entity: null,
+				error: null,
+				//result: null
+			});
+			// run application
+			new Controller();
+      console.log('STARTING!');
+			Backbone.history.start();
 		});
 		//
 		// define `now` client-side functions, they will be called by server
 		//
 		now.flash = function(s) {
-			flash(s);
+			$.Growl.show(s, {
+				icon: false,
+				title: false,
+				cls: '',
+				speed: 1000,
+				timeout: 50000
+			});
 		};
 		now.msg = function(s) {
 			now.act(s);
@@ -417,42 +371,4 @@ function ready() {
 	// other initialization
 	//
 	// ...
-};
-*/
-
-function upgradeToNowJS() {
-	console.log('NOWJSREADY');
-	//
-	// try to upgrade context to now.js
-	//
-	//
-	// N.B. we rely on server-side logic which sets secure signed cookie called sid which holds the session.
-	// ugly hack -- we fetch the sid cookie and pass it as parameter to `getContext` to get the user context
-	// FIXME: beautify, they work on now.js exposing the request object -- this would allow for pure server-side login
-	//
-	var sid = document.cookie.match(new RegExp('(?:^|;) *' + 'sid' + '=([^;]*)')); sid = sid && sid[1] || '';
-	// disconnect nullifies context
-	now.core.on('disconnect', function() {
-		console.log('DISCONNECTED');
-		model.unset('context');
-		// TODO: display reconnect link
-	});
-	// given sid, server should set now.context which holds the user capabilities
-	now.getContext(sid, function(response) {
-		console.log('GOT CONTEXT', response, now.context);
-		model.set({context: now.context});
-		// FIXME: should emit change event, to rerender
-	});
-	//
-	// define `now` client-side functions, they will be called by server
-	//
-	now.flash = function(s) {
-		flash(s);
-	};
-	now.msg = function(s) {
-		now.act(s);
-	};
-	now.receiveMessage = function(name, message) {
-		$("#messages").append("<br>" + name + ": " + message);
-	};
 };

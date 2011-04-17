@@ -42,10 +42,36 @@ Next({}, function(err, result, next) {
 	// native authentication
 	config.security.checkCredentials = model.checkCredentials;
 	// custom routes
+
+
+// FIXME: beautify
+var fallbackContext = function(context) {
+	var schema = {};
+	_.each(context, function(obj, name) {
+		var x = _.clone(obj);
+		_.each(_.functions(x), function(f) { x[f] = true; });
+		schema[name] = x.schema; delete x.schema;
+		context[name] = x;
+	});
+	return {
+		// functions
+		context: context,
+		// db schema
+		schema: schema,
+		// sanitized user profile
+		user: {
+			id: context.user.id,
+			name: context.user.name,
+			email: context.user.email,
+			roles: context.user.roles
+		}
+	};
+};
+
 	config.routes = [
 		['GET', '/', function(req, res, next) {
 			//console.log('HERE', req.context);
-			res.render('index', req.context);
+			res.render('index', fallbackContext(req.context));
 		}],
 	];
 	//

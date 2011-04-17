@@ -121,7 +121,7 @@ module.exports = function setup(options) {
 	function render(name, vars, callback) {
 		if (!vars) vars = {};
 		// render from cache
-		if (options.cache && cache.hasOwnProperty(name)) {
+		if (options.cache && Object.prototype.hasOwnProperty.call(cache, name)) {
 			callback(null, cache[name](vars));
 		// cache
 		} else {

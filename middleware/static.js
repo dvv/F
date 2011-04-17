@@ -45,7 +45,7 @@ module.exports = function setup(mount, root, index, options) {
 		if (path[path.length - 1] === '/') path = path.substr(0, path.length - 1);
 
 		// check if file stats is cached
-		if (options.cacheThreshold != null && statCache.hasOwnProperty(path)) {
+		if (options.cacheThreshold != null && Object.prototype.hasOwnProperty.call(statCache, path)) {
 			onStat(null, statCache[path]);
 		// get file stats
 		} else {
@@ -129,7 +129,7 @@ module.exports = function setup(mount, root, index, options) {
 			// serve cached contents
 			} else {
 				// cached?
-				if (fileCache.hasOwnProperty(path)) {
+				if (Object.prototype.hasOwnProperty.call(fileCache, path)) {
 					var cached = fileCache[path];
 					res.end((start > 0 || end != stat.size-1) ? cached.slice(start, end+1) : cached);
 				// read and cache

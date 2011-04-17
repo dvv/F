@@ -27,8 +27,6 @@ module.exports = function setup(root, options) {
 
 	// handler
 	return function handler(req, res, next) {
-		// parse out pathname if it's not there already (other middleware may have done it already)
-		//if (!req.hasOwnProperty('uri')) { req.uri = Url.parse(req.url); }
 
 		// mount relative to the given root
 		var path = req.uri.pathname;
@@ -120,7 +118,7 @@ module.exports = function setup(root, options) {
 				if (options.putNew || req.body.jsonrpc) {
 					// RPC
 					method = req.body.method;
-					params = [req.body.params];
+					params = req.body.params;
 				// else POST is solely for creation
 				} else {
 					// add
@@ -138,7 +136,7 @@ module.exports = function setup(root, options) {
 				for (var key in resource) {
 					var value = resource[key];
 					process.log(parts[0], key);
-					if (resource.hasOwnProperty(key) && value) {// && typeof value.apply === 'function') {
+					if (Object.prototype.hasOwnProperty.call(resource, key) && value) {// && typeof value.apply === 'function') {
 						// TODO: filter out 'private' methods?
 						methods.push(key);
 					}
@@ -152,18 +150,19 @@ module.exports = function setup(root, options) {
 			}
 
 			// debug
+			//console.log('RPC??', resource, method, params);
 			//return res.send([resource, method, params]);
 
 			//
 			// find the resource
 			//
 			// bail out unless resource is found
-			if (!context.hasOwnProperty(resource)) {
+			if (!Object.prototype.hasOwnProperty.call(context, resource)) {
 				return next();
 			}
 			resource = context[resource];
 			// bail out if method is unsupported
-			if (!resource.hasOwnProperty(method)) {
+			if (!Object.prototype.hasOwnProperty.call(resource, method)) {
 				return step((options.jsonrpc || req.body.jsonrpc) ? 'notsupported' : 405);
 			}
 			//
@@ -171,11 +170,13 @@ module.exports = function setup(root, options) {
 			//
 			params.unshift(context);
 			params.push(step);
+			//console.log('RPC?', params);
 			resource[method].apply(null, params);
 		//
 		// wrap the response to JSONRPC format, if specified by `options.jsonrpc` or `req.body.jsonrpc`
 		//
 		}, function(err, result, step) {
+			//console.log('RPC!', err, result);
 			if (options.jsonrpc || req.body.jsonrpc) {
 				var response = {
 					result: null,

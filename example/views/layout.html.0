@@ -31,45 +31,31 @@
 
 	<link rel="stylesheet" href="growl/css/growl.css" />
 
-	<script type="text/javascript" src="js/ender.js"></script>
-	<script>var context = {caps: <?= JSON.stringify(obj.context) ?>, schema: <?= JSON.stringify(obj.schema) ?>, user: <?= JSON.stringify(obj.user) ?>};</script>
+	<script type="text/javascript" src="js/LAB.min.js"></script>
 	<script type="text/javascript">
-		window._ = $; _.mixin = $.ender;
-		$.script([
-			'js/modernizr-1.7.min.js',
-			'growl/growl.js',
-			'js/backbone.js',
-			'js/underscore-data.js',
-			'/nowjs/now.js',
-			'/socket.io/socket.io.js'
-		], function() {
-			console.log('JSLOADED');
+		$LAB
+		.script('js/modernizr-1.7.min.js')
+		//.script('http://jashkenas.github.com/coffee-script/extras/coffee-script.js').wait()
+		//.script('http://sstephenson.github.com/eco/dist/eco.js')
+		.script('/nowjs/now.js')
+		.script('js/ender.js').wait()
+		//.script('js/jquery-1.5.2.min.js').wait()
+		//.script('js/jquery.tmpl.min.js')
+		//.script('js/jquery.jqote2.js')
+		//.script('js/pure.js')
+		//.script('js/weld.js')
+		//.script('js/kite.js')
+		//.script('js/ejs_production.js')
+		//.script('js/handlebar.js')
+		//.script('js/dust-full-0.3.0.js')
+		//.script('js/underscore.js')
+		.script('js/backbone.js').wait()
+		.script('growl/growl.js')
+		.script('js/app.js')
+		.wait(function(){
 			// scripts loaded
-			$.script('js/app.js', function() {
-				//return ready();
-				console.log('APPLOADED');
-				socket = new io.Socket(null, {
-					port: location.port,
-					secure: location.protocol === 'https:',
-					//transports: ['websocket', 'flashsocket'],
-					rememberTransport: false
-				});
-				// no transport? -> punt on this, fallback is ok
-				////if (!socket.transport) return ready();
-				socket.on('connect', function() {
-					console.log('CONNECTED');
-					var client = socket;
-					client.sessionId = 'server';
-					nowLib.handleNewConnection(client);
-					nowCore.emit('connect');
-					// run app
-					now.ready(upgradeToNowJS);
-				});
-				socket.connect();
-			});
 		});
 	</script>
-
 </head>
 
 <body class="container_16 clearfix">

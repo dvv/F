@@ -71,6 +71,7 @@ module.exports = function setup(options) {
 		'application/www-urlencoded': parseQS,
 		'application/x-www-form-urlencoded': parseQS,
 		'application/xml': guess,
+		'text/xml': guess,
 		// FIXME: streaming version?
 		'text/html': guess,
 		'text/plain': guess
@@ -119,7 +120,7 @@ module.exports = function setup(options) {
 			//
 			// parser registered for this content-type?
 			//
-			if (parsers.hasOwnProperty(type)) {
+			if (Object.prototype.hasOwnProperty.call(parsers, type)) {
 
 				// set body encoding
 				req.setEncoding('utf8');

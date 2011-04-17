@@ -38,8 +38,6 @@ module.exports = function setup(root, controllerFolder) {
 
 	// handler
 	return function handler(req, res, next) {
-		// parse out pathname if it's not there already (other middleware may have done it already)
-		//if (!req.hasOwnProperty('uri')) { req.uri = Url.parse(req.url); }
 
 		// Mount relative to the given root
 		var path = req.uri.pathname;
@@ -53,17 +51,18 @@ module.exports = function setup(root, controllerFolder) {
 
 		// Find the controller
 		var controller = parts.shift();
-		if (!controllers.hasOwnProperty(controller)) { return next(); }
+		if (!Object.prototype.hasOwnProperty.call(controllers, controller)) { return next(); }
 		controller = controllers[controller];
 
 		// Find the method
 		var method = parts.shift();
-		if (!controller.hasOwnProperty(method)) { return next(); }
+		if (!Object.prototype.hasOwnProperty.call(controller, method)) { return next(); }
 
 		// Call the controller's method
 		var args = [req, res, next];
 		args.push.apply(args, parts);
 		controller[method].apply(controller, args);
+
 	};
 
 };

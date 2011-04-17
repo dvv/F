@@ -1,0 +1,6 @@
+#!/bin/sh
+
+JEESH='qwery bean bonzo klass reqwest emile scriptjs underscore domready ender'
+for p in $JEESH; do
+	nmod install $p
+done

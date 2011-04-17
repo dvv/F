@@ -26,37 +26,100 @@
 
 </footer>
 
-<script id="tmpl-errors" type="text/x-jquery-tmpl">
-{{#}}
-ERR: {{message}}
-{{/}}
+<script id="tmpl-errors" type="text/x-template">
+<%$.each(obj,function(error){%>
+ERR: <%=error.message%>
+<%});%>
 </script>
 
-<script id="tmpl-profile" type="text/x-jquery-tmpl">
-ID: <a class="id">{{id}}</a>
-E-mail: <span class="email">{{email}}</span>
-Name: <span class="name">{{name}}</span>
-Roles: <ul class1="roles">{{#roles}}<li class="list">{{.|raw}}</li>{{/roles}}</ul>
+<script id="tmpl-profile" type="text/x-template">
+<%console.log('PROF', obj);%>
+ID: <a class="id"><%=obj.id%></a>
+E-mail: <span class="email"><%=obj.email%></span>
+Name: <span class="name"><%=obj.name%></span>
+Roles: <ul class="roles"><%$.each(obj.roles,function(role){%><li class="list"><%=role%></li><%});%></ul>
 </script>
 
-<script id="tmpl-menu" type="text/x-jquery-tmpl">
-{{#}}
-<a href="#list/{{.}}">{{.}}</a>&nbsp;
-{{/}}
+<script id="tmpl-menu" type="text/x-template">
+<%$.each(obj,function(item){%>
+<a href="#list/<%-item%>"><%=item%></a>&nbsp;
+<%});%>
 </script>
 
-<script id="tmpl-list111" type="text/x-jquery-tmpl">
-{{each items}}
-${ JSON.stringify($value) }
-{{/each}}
-</script>
-
-<script id="tmpl-list" type="text/x-jquery-tmpl">
-<div class="list-actions grid_3 alpha">{{#partials}}{{actions|raw}}{{/}}</div>
-</script>
-
-<script id="tmpl-Admin-actions" type="text/x-kite">
-ACTS
-{{JSON.stringify(context)}}
-/ACTS
+<script id="tmpl-list" type="text/x-template">
+<%console.log('LIST', obj);%>
+<div class="list-actions grid_3 alpha"><%=$.partial('#tmpl-'+obj.entity+'-actions,#tmpl-actions',{data:{}})||'&nbsp;'%></div>
+<div class="list grid_13 omega">
+	<% if (obj.actions.update || obj.actions.remove) { %>
+	<select class="actions">
+		<option></option>
+		<option value="all"><%=$.T('all')%></option>
+		<option value="none"><%=$.T('none')%></option>
+		<option value="toggle"><%=$.T('toggle')%></option>
+	</select>
+	<div id="inspector" class="list-item-inspector"></div>
+	<% } %>
+	<table id="list-<%=obj.entity%>">
+		<thead>
+			<tr>
+				<th></th>
+				<% $.each(obj.props, function(prop, name) { var sortVal = obj.query.meta.sort && obj.query.meta.sort[name] || undefined; %>
+				<th class="action-sort" rel="<%=name%>"<% if (sortVal) { %>data-sort="<%=sortVal%>"<% } %>><%=$.T(name)%><% if (sortVal) { %>&nbsp;(<%=sortVal%>)<% } %></th>
+				<% }); %>
+			</tr>
+			<tr>
+				<th><% if (obj.actions.update || obj.actions.remove) { %><input type="checkbox" class="action-select-all" /><% } %></th>
+				<% $.each(obj.props, function(prop, name) { var filterVal = obj.query.search && obj.query.search[name] && obj.query.search[name].args[1] || ''; %>
+				<th>
+					<% if (prop.type === 'boolean') { %>
+					<select name="<%=name%>" type="search" data-type="<%=prop.type%>" class="filter">
+						<option value=""></option>
+						<option value="true"<% if (filterVal === true) { %> selected="selected"<% } %>>Да</option>
+						<option value="false"<% if (filterVal === false) { %> selected="selected"<% } %>>Нет</option>
+					</select>
+					<% } else { %>
+					<input type="search" name="<%=name%>" data-type="<%=prop.type%>" class="filter"<% if (filterVal) { %> value="<%=filterVal%>"<% } %> />
+					<% } %>
+				</th>
+				<% }); %>
+			</tr>
+		</thead>
+		<tfoot></tfoot>
+		<tbody class="action-select-list"><% $.each(obj.items, function(item){ var id = item.id; %>
+			<tr class="action-select-row<% if (obj.selected.indexOf(id) >= 0) { %> selected<% } %>" rel="<%=id%>">
+				<td class="actions"><% if (obj.actions.update || obj.actions.remove) { %>
+					<input type="checkbox" class="action-select" <% if (~obj.selected.indexOf(id)) { %>checked="checked"<% } %> /><% } %>
+				</td>
+				<% $.each(obj.props, function(prop, name){ var val = item[name]; if (prop.type === 'date') val = (new Date(val)).toLocaleString(); %>
+				<td>
+				<% if (name === 'id') { %>
+					<a class="action-open" rel="<%=id%>" href="#<%=obj.entity%>/<%=id%>"><%=val%></a>
+				<% } else { %>
+					<%=val%>
+				<% } %>
+				</td>
+				<% }); %>
+			</tr>
+		<% }); %></tbody>
+	</table>
+	<% if (obj.items.length) { %>
+	<p><%=$.T('displayingItems', (1+obj.query.meta.skip||0), (obj.items.length+obj.query.meta.skip||0))%></p>
+	<% } else { %>
+	<p><%=$.T('displayingNone')%></p>
+	<% } %>
+	<div class="pager">
+		<% if (obj.query.meta.skip) { %>
+		<a href="#" class="page-prev"><%=$.T('prev')%></a>
+		<% } %>
+		<% if (obj.items.length >= obj.query.meta.limit) { %>
+		<a href="#" class="page-next"><%=$.T('next')%></a>
+		<% } %>
+		<select class="action-limit">
+			<option value="<%=obj.query.meta.limit%>"><%=obj.query.meta.limit%></option>
+			<option value="10">10</option>
+			<option value="25">25</option>
+			<option value="50">50</option>
+		</select>
+	</div>
+</div>
 </script>

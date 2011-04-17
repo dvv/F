@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+<head>
+	<script type="text/javascript" src="js/ender.js"></script>
+	<!--script type="text/javascript">
+		window._ = $; _.mixin = $.ender;
+		$.script([
+			'js/backbone.js',
+		], function() {
+		var C = Backbone.Controller.extend({
+			routes: {
+				help: 'help'
+			},
+			help: function() {
+				console.log('HELP');
+			}
+		});
+		new C();
+		Backbone.history.start();
+		});
+	</script-->
+	<!--script type="text/javascript" src="js/hz/underscore.js"></script>
+	<script type="text/javascript" src="js/hz/jquery-1.5.2.min.js"></script>
+	<script type="text/javascript" src="js/backbone.js"></script>
+	<script type="text/javascript">
+		var C = Backbone.Controller.extend({
+			routes: {
+				help: 'help'
+			},
+			help: function() {
+				console.log('HELP');
+			}
+		});
+		new C();
+		Backbone.history.start();
+	</script-->
+</head>
+<body></body>
+</html>
