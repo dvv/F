@@ -35,6 +35,9 @@
 	<script>var context = {caps: <?= JSON.stringify(obj.context) ?>, schema: <?= JSON.stringify(obj.schema) ?>, user: <?= JSON.stringify(obj.user) ?>};</script>
 	<script type="text/javascript">
 		window._ = $; _.mixin = $.ender;
+		// augment IE. for how long?!
+		if (typeof console == 'undefined') console = {log: alert};
+		//
 		$.script([
 			'js/modernizr-1.7.min.js',
 			'growl/growl.js',

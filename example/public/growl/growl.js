@@ -27,11 +27,12 @@
       this._getContainer().prepend(
         '<div id="'+settings.id+'" class="growlstatus '+settings.cls+'" style="display:none;"><div class="growlstatusclose"></div>'+settings.message+'</div>'
       );
-      
+
       var status = $("#"+settings.id);
+			console.log('STAT', settings.id, status);
       
       //bind close button
-      status.find(".growlstatusclose").bind('click',function(){
+      $(".growlstatusclose", status[0]).bind('click',function(){
         $.Growl.close(settings.id,true,settings.speed);
       });
       
@@ -59,7 +60,7 @@
         }
       )      
       //show status+handle timeout
-      .fadeIn(settings.speed,function(){
+      .show().fadeIn(settings.speed,function(){
         if(settings.timeout!==false){
           window.setTimeout(function(){$.Growl.close(settings.id);}, settings.timeout);
         }
@@ -86,7 +87,8 @@
     _getContainer: function(){
       
       if(!this._growlContainer) {
-        this._growlContainer = $('<div id="growlcontainer"></div>').appendTo("body");
+				$(document.body).append('<div id="growl-container" style="border: 1px solid red;"/>');
+				this._growlContainer = $('#growl-container');
       }
       return this._growlContainer;
     }

@@ -117,6 +117,7 @@ var fallbackContext = function(context) {
 	}
 	_.extend(now_http.now, {
 		act: function(s) {
+			console.log(this);
 			this.now.flash(s);
 		}
 	});

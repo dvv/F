@@ -13,9 +13,6 @@ http://stackoverflow.com/questions/4776261/views-within-views-how-to-generating-
 
 */
 
-// augment IE. for how long?!
-if (typeof console == 'undefined') console = {log: alert};
-
 //
 // --------------------------------------------------------------------
 //
