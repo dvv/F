@@ -60,7 +60,7 @@
         }
       )      
       //show status+handle timeout
-      .show().fadeIn(settings.speed,function(){
+      .fadeIn(settings.speed,function(){
         if(settings.timeout!==false){
           window.setTimeout(function(){$.Growl.close(settings.id);}, settings.timeout);
         }

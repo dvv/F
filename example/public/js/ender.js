@@ -47,7 +47,8 @@
 !function () { var module = { exports: {} }; !function (doc) {
   var loaded = 0, fns = [], ol, f = false,
       testEl = doc.createElement('a'),
-      domContentLoaded = 'DOMContentLoaded', readyState = 'readyState',
+      domContentLoaded = 'DOMContentLoaded',
+      addEventListener = 'addEventListener',
       onreadystatechange = 'onreadystatechange';
 
   function flush() {
@@ -57,15 +58,14 @@
     }
     testEl = null;
   }
-  doc.addEventListener && doc.addEventListener(domContentLoaded, function fn() {
-    doc[readyState] = "complete";
+  doc[addEventListener] && doc[addEventListener](domContentLoaded, function fn() {
     doc.removeEventListener(domContentLoaded, fn, f);
     flush();
   }, f);
 
 
   testEl.doScroll && doc.attachEvent(onreadystatechange, (ol = function ol() {
-    if (/^c/.test(doc[readyState])) {
+    if (/^c/.test(doc.readyState)) {
       doc.detachEvent(onreadystatechange, ol);
       flush();
     }
@@ -2106,6 +2106,99 @@
   });
 }).call(this);
  $.ender(module.exports); }();
+/**
+  * Klass.js - copyright @dedfat
+  * version 1.0
+  * https://github.com/ded/klass
+  * Follow our software http://twitter.com/dedfat :)
+  * MIT License
+  */
+!function (context, f) {
+  var fnTest = /xyz/.test(function () {
+    xyz;
+    }) ? /\bsupr\b/ : /.*/,
+      noop = function (){},
+      proto = 'prototype',
+      isFn = function (o) {
+        return typeof o === f;
+      };
+
+  function klass(o) {
+    return extend.call(typeof o == f ? o : noop, o, 1);
+  }
+
+  function wrap(k, fn, supr) {
+    return function () {
+      var tmp = this.supr;
+      this.supr = supr[proto][k];
+      var ret = fn.apply(this, arguments);
+      this.supr = tmp;
+      return ret;
+    };
+  }
+
+  function process(what, o, supr) {
+    for (var k in o) {
+      if (o.hasOwnProperty(k)) {
+        what[k] = typeof o[k] == f
+          && typeof supr[proto][k] == f
+          && fnTest.test(o[k])
+          ? wrap(k, o[k], supr) : o[k];
+      }
+    }
+  }
+
+  function extend(o, fromSub) {
+    noop[proto] = this[proto];
+    var supr = this,
+        prototype = new noop(),
+        isFunction = typeof o == f,
+        _constructor = isFunction ? o : this,
+        _methods = isFunction ? {} : o,
+        fn = function () {
+          fromSub || isFn(o) && supr.apply(this, arguments);
+          _constructor.apply(this, arguments);
+          if (this.initialize) {
+            this.initialize.apply(this, arguments);
+          }
+        };
+
+    fn.methods = function (o) {
+      process(prototype, o, supr);
+      fn[proto] = prototype;
+      return this;
+    };
+
+    fn.methods.call(fn, _methods).prototype.constructor = fn;
+
+    fn.extend = arguments.callee;
+    fn[proto].implement = fn.statics = function (o, optFn) {
+      o = typeof o == 'string' ? (function () {
+        var obj = {};
+        obj[o] = optFn;
+        return obj;
+      }()) : o;
+      process(this, o, supr);
+      return this;
+    };
+
+    return fn;
+  }
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = klass;
+  } else {
+    var old = context.klass;
+    klass.noConflict = function () {
+      context.klass = old;
+      return this;
+    };
+    context.klass = klass;
+  }
+
+}(this, 'function');$.ender({
+  klass: klass.noConflict()
+});
 /*!
   * $script.js v1.3
   * https://github.com/ded/script.js
@@ -2393,7 +2486,14 @@
       return 0;
     };
 
-  function boilerPlate(selector, root) {
+  function boilerPlate(selector, _root, fn) {
+    var root = (typeof _root == 'string') ? fn(_root)[0] : (_root || doc);
+    if (isNode(selector)) {
+      return !_root || (isNode(root) && isAncestor(selector, root)) ? [selector] : [];
+    }
+    if (typeof selector === 'object' && (selector.length || selector.length === 0)) {
+      return array(selector);
+    }
     if (m = selector.match(idOnly)) {
       return (el = doc.getElementById(m[1])) ? [el] : [];
     }
@@ -2409,13 +2509,10 @@
 
   function qsa(selector, _root) {
     var root = (typeof _root == 'string') ? qsa(_root)[0] : (_root || doc);
-    if (isNode(selector)) {
-      return !_root || isAncestor(selector, root) ? [selector] : [];
-    }
     if (!root) {
       return [];
     }
-    if (m = boilerPlate(selector, root)) {
+    if (m = boilerPlate(selector, _root, qsa)) {
       return m;
     }
     if (doc.getElementsByClassName && (m = selector.match(classOnly))) {
@@ -2445,14 +2542,11 @@
     }
     return function (selector, _root) {
       var root = (typeof _root == 'string') ? qwery(_root)[0] : (_root || doc);
-      if (isNode(selector)) {
-        return !_root || isAncestor(selector, root) ? [selector] : [];
-      }
       if (!root) {
         return [];
       }
       var i, l, result = [], collections = [], element;
-      if (m = boilerPlate(selector, root)) {
+      if (m = boilerPlate(selector, _root, qwery)) {
         return m;
       }
       if (m = selector.match(tagAndOrClass)) {
@@ -2872,9 +2966,19 @@ $._select = qwery.noConflict();
   };
   context.bonzo = bonzo;
 
-}(this);$.ender(bonzo);
-$.ender(bonzo(), true);
-bonzo.noConflict();
+}(this);!function () {
+  var b = bonzo.noConflict();
+  $.ender(b);
+  $.ender(b(), true);
+  $.ender({
+    create: function (node) {
+      return $(b.create(node));
+    }
+  });
+
+}();
+
+
 /*!
   * bean.js - copyright @dedfat
   * https://github.com/fat/bean
@@ -3267,14 +3371,6 @@ bonzo.noConflict();
     };
   }
 
-  function clone(o) {
-    var r = {};
-    for (var k in o) {
-      r[k] = o[k];
-    }
-    return r;
-  }
-
   function setHeaders(http, options) {
     var headers = options.headers;
     if (headers && options.data) {
@@ -3289,6 +3385,7 @@ bonzo.noConflict();
     http.open(o.method || 'GET', typeof o == 'string' ? o : o.url, true);
     setHeaders(http, o);
     http.onreadystatechange = readyState(http, fn, err);
+    o.before && o.before(http);
     http.send(o.data || null);
     return http;
   }
@@ -3603,6 +3700,7 @@ bonzo.noConflict();
     for (var i = 0, l = this.length; i < l; i++) {
       this[i].style.opacity = to ? 0 : 1;
       this[i].style.filter = 'alpha(opacity=' + (to ? 0 : 1 ) * 100 + ')';
+      this[i].style.display = '';
     }
     return this.animate({
       opacity: to,
