@@ -1,5 +1,5 @@
 var pg = require('pg').native;
-var conString = 'postgres://postgres:1Xticrjt2Gbdj3@localhost/postgres';
+var conString = 'postgres://dvv:Gfexjr@localhost/postgres';
 var client = new pg.Client(conString);
 client.on('drain', client.end.bind(client));
 client.connect();
