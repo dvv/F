@@ -2,7 +2,8 @@
 
 global._ = require 'underscore'
 pg = require('pg').native
-connectionStr = 'tcp://dvv:Gfexjr@localhost/postgres'
+#connectionStr = 'tcp://dvv:Gfexjr@localhost/postgres'
+connectionStr = 'tcp://postgres:1Xticrjt2Gbdj3@localhost/postgres'
 db = new pg.Client connectionStr
 db.on 'drain', db.end.bind db
 db.connect()
@@ -11,8 +12,8 @@ db.connect()
 nonce = () ->
 	(Date.now() & 0x7fff).toString(36) + Math.floor(Math.random() * 1e9).toString(36) + Math.floor(Math.random() * 1e9).toString(36) + Math.floor(Math.random() * 1e9).toString(36)
 
-db.query 'DROP TABLE foo', console.log
-db.query 'CREATE TABLE foo(name varchar(10), height integer, birthday timestamptz)', console.log
+#db.query 'DROP TABLE users', console.log
+#db.query 'CREATE TABLE users(id serial not null primary key, name varchar(10), height integer, dob timestamptz)', console.log
 
 #
 # operators
@@ -87,13 +88,13 @@ class Store
 			update: @schema.fields.update
 
 	exec: (sql, params) ->
-		console.log 'QUERY', arguments
-		return
+		#console.log 'EXEC', arguments
+		#return
 		db.query(
 			name: sql
 			text: sql
 			values: params
-		)
+		).on 'error', (err) -> console.log 'ERREXEC', err
 
 	add: (record) ->
 		keys = []
@@ -103,7 +104,7 @@ class Store
 			params.push v
 			keys.push k
 			values.push "$#{params.length}"
-		sql = "insert into #{@name}(#{keys.join(',')}) values(#{values.join(',')}) returning *"
+		sql = "insert into #{@name}(#{keys.join(',')}) values(#{values.join(',')}) returning id"
 		@exec sql, params
 
 	delete: (cond) ->
@@ -142,6 +143,16 @@ class Store
 		@exec sql, parsed.params
 
 	#
+	# stream all records
+	#
+	stream: (filterFn) ->
+		sql = "select #{@fields.query.join(',')} from #{@name}"
+		@exec sql, []
+		#@exec(sql, []).on('row', () ->
+		#).on('end', () ->
+		#)
+
+	#
 	# return an unforgeable set of this entity accessor methods
 	#
 	facet: () ->
@@ -165,9 +176,10 @@ rec = {name: 'Ringo', height: 67, dob: new Date()}
 User = new Store
 	collection: 'users'
 	fields:
-		get: ['dob']
+		#get: ['dob']
 		update: ['height', 'foo']
 
+###
 User.add rec
 User.get 1
 User.query 'name.ilike': 'hz', '.limit': 10
@@ -175,13 +187,15 @@ User.update 'id.in': null,
 	name: 'Starr'
 	foo: 'Bar'
 User.delete 'height.gt': 60
-
 process.exit()
+###
 
-n = 1
+###
+n = 10000
 ts1 = new Date()
 insert = (i) ->
-	Foo.add(rec).on('end', () ->
+	User.add(rec
+	).on('end', () ->
 		#console.log 'END', arguments
 		if --i
 			insert i
@@ -191,3 +205,20 @@ insert = (i) ->
 		return
 	)
 insert n
+###
+
+n = 10000
+ts1 = new Date()
+fetch = (i) ->
+	User.get(Math.floor(Math.random() * 10000)).on('row', () -> 
+		#console.log 'ROW', arguments
+	).on('end', () ->
+		#console.log 'END', arguments
+		if --i
+			fetch i
+		else
+			ts2 = new Date()
+			console.log 'DONE', n*1000/(ts2-ts1)
+		return
+	)
+fetch n

@@ -10,7 +10,8 @@ require.paths.unshift '/home/dvv/node_modules'
 # reach db
 #
 db = require 'FastLegS'
-db.connect 'tcp://dvv:Gfexjr@localhost/postgres'
+#db.connect 'tcp://dvv:Gfexjr@localhost/postgres'
+db.connect 'tcp://postgres:1Xticrjt2Gbdj3@localhost/postgres'
 
 #
 # mimick IndexedDB api
