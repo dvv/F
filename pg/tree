@@ -1,27 +1,18 @@
---delete from users;
---insert into users(user_name) values('aaa');
---select * from users;
---insert into posts(user_id,ref_id) values(10002,3);
---select * from objects;
-
---select o.obj_id, o.user_id from objects o inner join objects s on (s.ref_id=o.obj_id) where o.ref_id=1;
-/*select o.obj_id, o.user_id from objects o
-union select s.obj_id, s.user_id from objects s
-where s.ref_id=o.obj_id and o.ref_id=1;*/
-
---select o.obj_id, o.user_id from objects o;
---select * from only objects;
---select * from posts;
-
-with recursive t(node, path) as (
-select obj_id, array[obj_id]
-from objects
-where ref_id is null
-union all
-select o.obj_id, t.path || array[o.obj_id]
-from objects o join t on (o.ref_id = t.node)
-where o.obj_id not in (t.path)
-) select case when array_upper(path,1)>1 then '+-' else '' end ||
-repeat('--', array_upper(path,1)-2) || node as "Branch"
-from t
-order by path;
+DROP FUNCTION get_objects(INTEGER);
+DROP TYPE object;
+CREATE TYPE object as (id BIGINT, user_id BIGINT, path BIGINT[]);
+CREATE FUNCTION get_objects(INTEGER)
+RETURNS SETOF object AS '
+-- $1 - user access level
+WITH RECURSIVE obj_tree AS (
+  SELECT o.*, ARRAY[o.id] AS path
+    FROM objects o
+    WHERE o.ref_id IS NULL AND o.access <= $1
+  UNION ALL
+    SELECT t.*, tt.path || t.id AS path
+    FROM objects t
+    JOIN obj_tree tt ON t.ref_id = tt.id
+    WHERE t.access <= $1
+)
+SELECT id, user_id, path FROM obj_tree;
+' LANGUAGE 'SQL';

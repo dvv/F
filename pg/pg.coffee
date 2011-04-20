@@ -2,8 +2,8 @@
 
 global._ = require 'underscore'
 pg = require('pg').native
-#connectionStr = 'tcp://dvv:Gfexjr@localhost/postgres'
-connectionStr = 'tcp://postgres:1Xticrjt2Gbdj3@localhost/postgres'
+connectionStr = 'tcp://dvv:Gfexjr@localhost/postgres'
+#connectionStr = 'tcp://postgres:1Xticrjt2Gbdj3@localhost/postgres'
 db = new pg.Client connectionStr
 db.on 'drain', db.end.bind db
 db.connect()
@@ -11,9 +11,6 @@ db.connect()
 
 nonce = () ->
 	(Date.now() & 0x7fff).toString(36) + Math.floor(Math.random() * 1e9).toString(36) + Math.floor(Math.random() * 1e9).toString(36) + Math.floor(Math.random() * 1e9).toString(36)
-
-#db.query 'DROP TABLE users', console.log
-#db.query 'CREATE TABLE users(id serial not null primary key, name varchar(10), height integer, dob timestamptz)', console.log
 
 #
 # operators
@@ -41,6 +38,7 @@ cond2where = (cond = {}, params, options = {}) ->
 	offset = 0
 	for own k, v of cond
 		[field, op] = k.split '.'
+		op ?= 'eq'
 		# special case: key starting with dot
 		if field is ''
 			# limit
@@ -64,7 +62,7 @@ cond2where = (cond = {}, params, options = {}) ->
 				where.push "1=0"
 				continue
 		op = operatorMap[op]
-		params.push(v || 'NULL')
+		params.push(if v? then v else 'NULL')
 		# FIXME: sanitize `field`
 		if enclose
 			where.push "#{field} #{op} ($#{params.length})"
@@ -190,6 +188,9 @@ User.delete 'height.gt': 60
 process.exit()
 ###
 
+#db.query 'DROP TABLE users CASCADE', console.log
+#db.query 'CREATE TABLE users(id serial not null primary key, name varchar(10), height integer, dob timestamptz)', console.log
+
 ###
 n = 10000
 ts1 = new Date()
@@ -205,7 +206,6 @@ insert = (i) ->
 		return
 	)
 insert n
-###
 
 n = 10000
 ts1 = new Date()
@@ -222,3 +222,22 @@ fetch = (i) ->
 		return
 	)
 fetch n
+
+n = 10000
+ts1 = new Date()
+fetch = (i) ->
+	User.query({id: Math.floor(Math.random() * 10000)}).on('row', () -> 
+		#console.log 'ROW', arguments
+	).on('end', () ->
+		#console.log 'END', arguments
+		if --i
+			fetch i
+		else
+			ts2 = new Date()
+			console.log 'DONE', n*1000/(ts2-ts1)
+		return
+	)
+fetch n
+###
+
+#db.query 'select * from v_object_tree', console.log

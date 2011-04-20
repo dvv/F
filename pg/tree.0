@@ -1,0 +1,27 @@
+--delete from users;
+--insert into users(user_name) values('aaa');
+--select * from users;
+--insert into posts(user_id,ref_id) values(10002,3);
+--select * from objects;
+
+--select o.obj_id, o.user_id from objects o inner join objects s on (s.ref_id=o.obj_id) where o.ref_id=1;
+/*select o.obj_id, o.user_id from objects o
+union select s.obj_id, s.user_id from objects s
+where s.ref_id=o.obj_id and o.ref_id=1;*/
+
+--select o.obj_id, o.user_id from objects o;
+--select * from only objects;
+--select * from posts;
+
+with recursive t(node, path) as (
+select obj_id, array[obj_id]
+from objects
+where ref_id is null
+union all
+select o.obj_id, t.path || array[o.obj_id]
+from objects o join t on (o.ref_id = t.node)
+where o.obj_id not in (t.path)
+) select case when array_upper(path,1)>1 then '+-' else '' end ||
+repeat('--', array_upper(path,1)-2) || node as "Branch"
+from t
+order by path;
