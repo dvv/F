@@ -2,8 +2,8 @@
 
 global._ = require 'underscore'
 pg = require('pg').native
-connectionStr = 'tcp://dvv:Gfexjr@localhost/postgres'
-#connectionStr = 'tcp://postgres:1Xticrjt2Gbdj3@localhost/postgres'
+#connectionStr = 'tcp://dvv:Gfexjr@localhost/postgres'
+connectionStr = 'tcp://postgres:1Xticrjt2Gbdj3@localhost/postgres'
 db = new pg.Client connectionStr
 db.on 'drain', db.end.bind db
 db.connect()
@@ -188,14 +188,14 @@ User.delete 'height.gt': 60
 process.exit()
 ###
 
-#db.query 'DROP TABLE users CASCADE', console.log
-#db.query 'CREATE TABLE users(id serial not null primary key, name varchar(10), height integer, dob timestamptz)', console.log
+db.query 'DROP TABLE users CASCADE', console.log
+db.query 'CREATE TABLE users(id serial not null primary key, name varchar(10), height integer, dob timestamptz)', console.log
 
-###
+
 n = 10000
 ts1 = new Date()
 insert = (i) ->
-	User.add(rec
+	User.add(_.extend({}, rec, {name: nonce()})
 	).on('end', () ->
 		#console.log 'END', arguments
 		if --i
@@ -207,6 +207,7 @@ insert = (i) ->
 	)
 insert n
 
+###
 n = 10000
 ts1 = new Date()
 fetch = (i) ->

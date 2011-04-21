@@ -1,0 +1,308 @@
+*3
+$3
+set
+$10
+string key
+$10
+string val
+*4
+$4
+hset
+$8
+hash key
+$10
+hashtest 1
+$10
+some value
+*4
+$4
+hset
+$8
+hash key
+$10
+hashtest 2
+$16
+some other value
+*3
+$3
+set
+$10
+string key
+$10
+string val
+*4
+$4
+hset
+$8
+hash key
+$10
+hashtest 1
+$10
+some value
+*4
+$4
+hset
+$8
+hash key
+$10
+hashtest 2
+$16
+some other value
+*3
+$5
+setnx
+$8
+u:aaa:id
+$3
+aaa
+*3
+$3
+set
+$10
+string key
+$10
+string val
+*4
+$4
+hset
+$8
+hash key
+$10
+hashtest 1
+$10
+some value
+*4
+$4
+hset
+$8
+hash key
+$10
+hashtest 2
+$16
+some other value
+*3
+$5
+setnx
+$8
+u:aaa:id
+$3
+aaa
+*3
+$3
+set
+$10
+string key
+$10
+string val
+*4
+$4
+hset
+$8
+hash key
+$10
+hashtest 1
+$10
+some value
+*4
+$4
+hset
+$8
+hash key
+$10
+hashtest 2
+$16
+some other value
+*3
+$5
+setnx
+$8
+u:aaa:id
+$3
+aaa
+*3
+$3
+set
+$10
+string key
+$10
+string val
+*4
+$4
+hset
+$8
+hash key
+$10
+hashtest 1
+$10
+some value
+*4
+$4
+hset
+$8
+hash key
+$10
+hashtest 2
+$16
+some other value
+*3
+$5
+setnx
+$8
+u:aaa:id
+$3
+aaa
+*3
+$3
+set
+$10
+string key
+$10
+string val
+*4
+$4
+hset
+$8
+hash key
+$10
+hashtest 1
+$10
+some value
+*4
+$4
+hset
+$8
+hash key
+$10
+hashtest 2
+$16
+some other value
+*3
+$5
+setnx
+$8
+u:aaa:id
+$3
+aaa
+*3
+$5
+setnx
+$8
+u:bbb:id
+$3
+bbb
+*3
+$5
+setnx
+$8
+u:bbb:id
+$3
+bbb
+*3
+$5
+setnx
+$26
+u:1t3csvz3u4469npfliaci:id
+$21
+1t3csvz3u4469npfliaci
+*3
+$5
+setnx
+$25
+u:nak2kj0axbk0m1razwzg:id
+$20
+nak2kj0axbk0m1razwzg
+*6
+$5
+hmset
+$27
+u:nak2kj0axbk0m1razwzg:cred
+$5
+email
+$4
+null
+$4
+pass
+$4
+null
+*3
+$5
+setnx
+$24
+u:libj2fwa76onhaw83x7:id
+$19
+libj2fwa76onhaw83x7
+*3
+$5
+setnx
+$26
+u:26ddi11k27b0a4s3m1c0n:id
+$21
+26ddi11k27b0a4s3m1c0n
+*3
+$5
+setnx
+$26
+u:heu3nsw7h1wx76h6oii8y:id
+$21
+heu3nsw7h1wx76h6oii8y
+*5
+$4
+mset
+$10
+incr thing
+$3
+100
+$16
+incr other thing
+$1
+1
+*2
+$4
+incr
+$10
+incr thing
+*2
+$4
+incr
+$16
+incr other thing
+*2
+$4
+incr
+$10
+incr thing
+*2
+$4
+incr
+$16
+incr other thing
+*2
+$4
+incr
+$8
+multifoo
+*2
+$4
+incr
+$8
+multibar
+*3
+$5
+setnx
+$26
+u:7ocgaiirgdl4sdd6aplpv:id
+$21
+7ocgaiirgdl4sdd6aplpv
+*6
+$5
+hmset
+$28
+u:7ocgaiirgdl4sdd6aplpv:cred
+$5
+email
+$4
+null
+$4
+pass
+$4
+null

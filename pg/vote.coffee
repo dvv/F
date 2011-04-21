@@ -2,7 +2,7 @@
 
 global._ = require 'underscore'
 pg = require('pg').native
-connectionStr = 'tcp://dvv:Gfexjr@localhost/postgres'
+connectionStr = 'tcp://dvv:Gfexjr@localhost/dvv'
 #connectionStr = 'tcp://postgres:1Xticrjt2Gbdj3@localhost/postgres'
 db = new pg.Client connectionStr
 db.on 'drain', db.end.bind db
@@ -82,6 +82,12 @@ unvote = (user_id, obj_id) ->
 
 unvote 1, 3
 vote 1, 3
+
+setRel = (uid, tid, value) ->
+	query 'select set_rel($1,$2,$3)', uid, tid, value, () ->
+		console.log 'SETREL', arguments
+
+setRel 2, 3, 2
 
 #query("select * from get_objects(0)").on 'row', () ->
 #	console.log arguments

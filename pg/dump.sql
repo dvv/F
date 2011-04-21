@@ -8,7 +8,6 @@ SET standard_conforming_strings = off;
 SET check_function_bodies = false;
 SET client_min_messages = warning;
 SET escape_string_warning = off;
-
 SET search_path = public, pg_catalog;
 
 --
@@ -323,12 +322,12 @@ ALTER TABLE ONLY objects
 
 
 --
--- Name: public; Type: ACL; Schema: -; Owner: postgres
+-- Name: public; Type: ACL; Schema: -; Owner: dvv
 --
 
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
-REVOKE ALL ON SCHEMA public FROM postgres;
-GRANT ALL ON SCHEMA public TO postgres;
+REVOKE ALL ON SCHEMA public FROM dvv;
+GRANT ALL ON SCHEMA public TO dvv;
 GRANT ALL ON SCHEMA public TO PUBLIC;
 
 
