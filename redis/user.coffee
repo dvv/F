@@ -61,36 +61,22 @@ iter n
 users						{ u:* }	# all users
 u:UID:
 			email			string
-			objs			{ o:* }	# own objects
+			obyt			{ o:*, type }	# own objects by type
+			obyd			{ o:*, date }	# own objects by date
+			obya			{ o:*, acc }	# own objects by access level
 			watch			{ o:* }	# watched objects
-			l0				{ u:* }	# users related as access level 0
-			l1				{ u:* } # ...
-			l2				{ u:* }
-			l3				{ u:* }
-			l4				{ u:* }
+			contacts	{ u:*, level }	# related users with levels
 
-objs						{ o:* }	# all objects
+obyt						{ o:*, type }	# all objects by type
+obyd						{ o:*, date }	# all objects by date
+obya						{ o:*, acc }	# all objects by access level
 o:UID:
-			type			string
-			uid				u:*			# owner user ley
-			acc				-999-999		# access level
+			uid				u:*			# owner user key
 			parent		o:*			# parent object
-			children	{ o:* }	# subordinate objects
+			children	{ o:*, date }	# subordinate objects by date
+			acc				-999-999		# access level
 
 #######################
-
-ACCESS_LEVELS = [0, 1, 2, 3, 4]
-
-###
-load = (schema, keys..., next) ->
-	if keys.length is 1
-		keys = keys[0]
-	#console.log 'LOAD', keys
-	db.mget keys, (err, reply) ->
-		console.log 'LOADED', arguments
-		next? err, reply
-	return
-###
 
 #
 # notify of various events
@@ -98,6 +84,8 @@ load = (schema, keys..., next) ->
 notify = (data) ->
 	data.date = new Date()
 	db.rpush 'events', JSON.stringify data
+	console.error JSON.stringify data
+	# TODO: emit
 
 #
 # hydrate keys into objects
@@ -116,7 +104,8 @@ load = (schema, keys..., next) ->
 #
 class Obj
 
-	constructor: (@id) ->
+	constructor: (T, @id) ->
+
 	load: (next) ->
 		redis2json.load object, {id: @id}, (err, result) ->
 			console.log 'LOADED', err, result
@@ -165,7 +154,7 @@ class User
 			return next? ERR_FORBIDDEN if exists
 			cmds = [
 				# append user to user list
-				['sadd', 'users', id]
+				['zadd', 'users', Date.now(), id]
 				# store user data
 				# FIXME: shouldn't it be spread by keys?
 				['hmset', "#{id}", self]
@@ -181,7 +170,7 @@ class User
 		return
 
 	#
-	# create new user
+	# securely set this user password
 	# TODO: sha1sum, notify
 	#
 	setPassword: (newPassword, confirmPassword, next) ->
@@ -199,15 +188,9 @@ class User
 		u1 = "u:#{self.id}"
 		u2 = "u:#{uid}"
 		cmds = []
-		# prune any old relations
-		ACCESS_LEVELS.forEach (l) ->
-			return if l is level
-			cmds.push ['srem', "#{u1}:l#{l}", u2]
-			cmds.push ['srem', "#{u2}:l#{l}", u1]
-		# add new relation
-		cmds.push ['sadd', "#{u1}:l#{level}", u2]
-		cmds.push ['sadd', "#{u2}:l#{level}", u1]
-		#console.log cmds
+		# add relations
+		cmds.push ['zadd', "#{u1}:contacts", level, u2]
+		cmds.push ['zadd', "#{u2}:contacts", level, u1]
 		db.multi(cmds).exec (err, reply) ->
 			return next? err if err
 			# notify both sides
@@ -225,47 +208,136 @@ class User
 		return
 
 	#
+	# remove relation of this user to another user
+	# TODO: this should be in two steps, because we require target user confirmation
+	#
+	unsetRelation: (uid, next) ->
+		self = @
+		u1 = "u:#{self.id}"
+		u2 = "u:#{uid}"
+		cmds = []
+		# remove relations
+		cmds.push ['zrem', "#{u1}:contacts", u2]
+		cmds.push ['zrem', "#{u2}:contacts", u1]
+		db.multi(cmds).exec (err, reply) ->
+			return next? err if err
+			# notify both sides
+			notify
+				what: 'unsetRelation'
+				who: self.id
+				target: uid
+			notify
+				what: 'unsetRelation'
+				who: uid
+				target: self.id
+			next? null
+		return
+
+	#
 	# get relation of this user to another user
-	# TODO: will be the bottleneck and should be optimized!
 	#
 	getRelation: (uid, next) ->
-		# this user key
-		who = "u:#{@id}"
-		# target user key
-		to = "u:#{uid}"
-		# find of which access level is this user to the target user
-		async.detect ACCESS_LEVELS
-			, (level, cb) ->
-				db.sismember "#{to}:l#{level}", who, (err, reply) -> cb reply
-			, (relation) ->
-				next? null, relation
+		db.zscore "u:#{uid}:contacts", "u:#{@id}", next
 		return
 
 	#
 	# create new object
 	#
 	addObject: (oid, type, acc, parent, next) ->
+		self = @
 		# TODO: via new Obj
 		#obj = new Obj oid
 		#obj.type = type
 		#obj.acc = acc
 		id = "o:#{oid}"
+		date = Date.now()
 		db.multi([
-			['setnx', "#{id}:uid", "u:#{@id}"]
-			['set', "#{id}:type", type]
-			['set', "#{id}:acc", acc]
-			['set', "#{id}:parent", "o:#{parent}"] # FIXME: ensure parent exists?
-			['sadd', 'objs', id]
-			if parent then ['sadd', "o:#{parent}:children", id] else ['dbsize'] # FIXME: noop
-			['sadd', "u:#{@id}:objs", id]
-		]).exec next
+			['setnx', "#{id}:uid", "u:#{self.id}"]
+			if parent then ['set', "#{id}:parent", "o:#{parent}"] else ['dbsize'] # FIXME: ensure parent exists?
+			if parent then ['zadd', "o:#{parent}:children", date, id] else ['dbsize']
+			['zadd', 'obyt', type, id]
+			['zadd', 'obyd', date, id]
+			['zadd', 'obya', acc, id]
+			['zadd', "u:#{self.id}:obyt", type, id]
+			['zadd', "u:#{self.id}:obyd", date, id]
+			['zadd', "u:#{self.id}:obya", acc, id]
+		]).exec (err, reply) ->
+			return next? err if err
+			# notify
+			notify
+				what: 'addObject'
+				who: self.id
+				target: oid
+				parent: parent
+			next? null
 		return
 
 	#
-	# get owned objects
+	# remove an owned object
 	#
-	getOwnedObjects: (next) ->
-		db.smembers "u:#{@id}:objs", next
+	removeObject: (oid, next) ->
+		self = @
+		id = "o:#{oid}"
+		db.get "#{id}:parent", (err, parent) ->
+			db.multi([
+				if parent then ['zrem', "o:#{parent}:children", id] else ['dbsize']
+				['zrem', "u:#{self.id}:obyt", id]
+				['zrem', "u:#{self.id}:obyd", id]
+				['zrem', "u:#{self.id}:obya", id]
+				['zrem', 'obyt', id]
+				['zrem', 'obyd', id]
+				['zrem', 'obya', id]
+				['del', "#{id}:parent", "#{id}:uid"]
+			]).exec (err, reply) ->
+				return next? err if err
+				# notify
+				notify
+					what: 'removeObject'
+					who: self.id
+					target: oid
+					parent: parent
+				next? null
+		return
+
+	#
+	# set access level of an owned object
+	#
+	setObjectAccess: (oid, access, next) ->
+		self = @
+		id = "o:#{oid}"
+		db.mget "o:#{oid}:uid", "u:#{self.id}", (err, result) ->
+			return next? err if err
+			if result[0] is result[1]
+				db.multi([
+					['zadd', 'obya', access, id]
+					['zadd', "u:#{self.id}:obya", access, id]
+				]).exec (err, reply) ->
+					# notify
+					notify
+						what: 'setObjectAccess'
+						who: self.id
+						target: oid
+						value: access
+					next? null
+			else
+				next? ERR_FORBIDDEN
+		return
+
+	#
+	# get user owned objects from key `key` honoring `privacy` access level
+	#
+	getObjects: (key, privacy, options = {}, next) ->
+		# TODO: limit start, end
+		if privacy < 0
+			min = max = -privacy
+		else
+			min = 0
+			max = privacy
+		if options.schema
+			db.zrangebyscore "u:#{@id}:#{key}", min, max, (err, keys) ->
+				load options.schema, keys, next
+		else
+			db.zrangebyscore "u:#{@id}:#{key}", min, max, next
 		return
 
 	#
@@ -277,41 +349,13 @@ class User
 		id = "o:#{oid}"
 		# get the object owner
 		db.mget "o:#{oid}:uid", "o:#{oid}:acc", (err, reply) ->
-			return next? err if err
+			return next? null, false if err
 			[owner, access] = reply
 			#console.log 'OWNER', owner, user, access
 			# get the user to the owner relation
 			self.getRelation owner.substring(2), (relation) ->
 				# user is of `relation` to the owner
-				# N.B. access is granted iff:
-				# 1. object level is negative and modulo equals to relation
-				# 2. object level is non-negative and less or equal to relation
-				### test suite
-				for acc in [-2..2]
-					for rel in [undefined, 0, 1, 2]
-						console.log 'CAN?', acc, rel, (acc + rel is 0 or 0 <= acc <= rel)
-				###
 				next? null, (access + relation is 0 or 0 <= access <= relation)
-		return
-
-	#
-	# set access level of an owned object
-	#
-	setAccessToObj: (oid, acc, next) ->
-		self = @
-		db.mget "o:#{oid}:uid", "u:#{self.id}", (err, result) ->
-			return next? err if err
-			if result[0] is result[1]
-				db.set "o:#{oid}:acc", acc, (err, reply) ->
-					# notify
-					notify
-						what: 'setAccessToObj'
-						who: self.id
-						target: oid
-						value: acc
-					next? null
-			else
-				next? ERR_FORBIDDEN
 		return
 
 	#
@@ -387,10 +431,11 @@ class User
 
 #######################
 
-db.flushall()
-
 aaa = bbb = ccc = null
+###
 async.series [
+	(cb) ->
+		db.flushall cb
 	(cb) ->
 		aaa = new User 'aaa'
 		aaa.email = 'aaa@foo.bar'
@@ -402,17 +447,58 @@ async.series [
 		bbb.bar = 'baz'
 		bbb.register cb
 	(cb) ->
-		aaa.addObject 'oaaa1', 'post', 0
-		aaa.addObject 'oaaa2', 'post', 0
-		aaa.addObject 'oaaa3', 'post', 0
-		bbb.addObject 'obbb1', 'post', 0
-		bbb.addObject 'obbb2', 'post', 0
-		bbb.addObject 'obbb3', 'post', 0
+		aaa.addObject 'oaaa1', 1, 0
+		aaa.addObject 'oaaa2', 2, 0
+		aaa.addObject 'oaaa3', 3, 0
+		bbb.addObject 'obbb1', 1, 0
+		bbb.addObject 'obbb2', 2, 0
+		bbb.addObject 'obbb3', 3, 0
 		cb()
+	(cb) ->
+		aaa.setRelation 'bbb', 1, cb
+	(cb) ->
+		aaa.getRelation 'bbb', cb
+	(cb) ->
+		aaa.getObjects 'obyt', -2, {}, cb
+	(cb) ->
+		bbb.getObjects 'obyt', 2, {}, cb
 	(cb) ->
 		ccc = new User 'bbb'
 		ccc.email = 'ccc@foo.bar'
 		ccc.register cb
+], (err, results) ->
+	console.log arguments
+###
+
+async.series [
+	(cb) ->
+		db.flushall cb
+	(cb) ->
+		aaa = new User 'aaa'
+		aaa.email = 'aaa@foo.bar'
+		aaa.foo = 'bar'
+		aaa.register cb
+	(cb) ->
+		aaa.addObject 'oaaa1', 1, 0
+		aaa.addObject 'oaaa2', 2, 0
+		aaa.addObject 'oaaa3', 3, 0
+		cb()
+	(cb) ->
+		aaa.getObjects 'obyt', -2, {}, cb
+	(cb) ->
+		aaa.getObjects 'obya', 0, {}, cb
+	(cb) ->
+		aaa.getObjects 'obyd', Date.now(), {}, cb
+	(cb) ->
+		aaa.removeObject 'oaaa1', cb
+	(cb) ->
+		aaa.getObjects 'obyt', -2, {schema: ObjSchema}, (err, result) ->
+			console.log 'OBJ', result
+			cb()
+	(cb) ->
+		aaa.getObjects 'obya', 0, {}, cb
+	(cb) ->
+		aaa.getObjects 'obyd', Date.now(), {}, cb
 ], (err, results) ->
 	console.log arguments
 
@@ -443,4 +529,3 @@ aaa.getOwnedObjects (err, keys) ->
 		console.log 'OBJECTS', err, result
 ###
 
-#aaa.load console.log

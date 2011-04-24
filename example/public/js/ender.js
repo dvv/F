@@ -3,6 +3,7 @@
   * copyright Dustin Diaz & Jacob Thornton 2011 (@ded @fat)
   * https://github.com/ded/Ender.js
   * License MIT
+  * Build: ender -j jeesh underscore-data
   */
 !function (context) {
 
@@ -51,12 +52,13 @@
       addEventListener = 'addEventListener',
       onreadystatechange = 'onreadystatechange';
 
+  /^loade|c/.test(doc.readyState) && (loaded = 1);
+
   function flush() {
     loaded = 1;
     for (var i = 0, l = fns.length; i < l; i++) {
       fns[i]();
     }
-    testEl = null;
   }
   doc[addEventListener] && doc[addEventListener](domContentLoaded, function fn() {
     doc.removeEventListener(domContentLoaded, fn, f);
@@ -2156,10 +2158,11 @@
         _constructor = isFunction ? o : this,
         _methods = isFunction ? {} : o,
         fn = function () {
-          fromSub || isFn(o) && supr.apply(this, arguments);
-          _constructor.apply(this, arguments);
           if (this.initialize) {
             this.initialize.apply(this, arguments);
+          } else {
+            fromSub || isFn(o) && supr.apply(this, arguments);
+            _constructor.apply(this, arguments);
           }
         };
 
@@ -2491,7 +2494,7 @@
     if (isNode(selector)) {
       return !_root || (isNode(root) && isAncestor(selector, root)) ? [selector] : [];
     }
-    if (typeof selector === 'object' && (selector.length || selector.length === 0)) {
+    if (selector && typeof selector === 'object' && selector.length && isFinite(selector.length)) {
       return array(selector);
     }
     if (m = selector.match(idOnly)) {
@@ -2575,7 +2578,7 @@
     };
   }();
 
-  // being nice
+  qwery.uniq = uniq;
   var oldQwery = context.qwery;
   qwery.noConflict = function () {
     context.qwery = oldQwery;
@@ -2584,7 +2587,22 @@
   context.qwery = qwery;
 
 }(this, document);
-$._select = qwery.noConflict();
+!function () {
+  var q = qwery.noConflict();
+  $._select = q;
+  $.ender({
+    find: function (s) {
+      var r = [], i, l, j, k, els;
+      for (i = 0, l = this.length; i < l; i++) {
+        els = q(s, this[i]);
+        for (j = 0, k = els.length; j < k; j++) {
+          r.push(els[j]);
+        }
+      }
+      return $(q.uniq(r));
+    }
+  }, true);
+}();
 /*!
   * bonzo.js - copyright @dedfat 2011
   * https://github.com/ded/bonzo
@@ -2597,7 +2615,9 @@ $._select = qwery.noConflict();
       html = doc.documentElement,
       specialAttributes = /^checked|value|selected$/,
       stateAttributes = /^checked|selected$/,
-      ie = /msie/.test(navigator.userAgent);
+      ie = /msie/.test(navigator.userAgent),
+      uidList = [],
+      uuids = 0;
 
   function classReg(c) {
     return new RegExp("(^|\\s+)" + c + "(\\s+|$)");
@@ -2663,22 +2683,11 @@ $._select = qwery.noConflict();
     },
 
     first: function () {
-      this.elements = [this[0]];
-      this.each(function (el, i) {
-        i && (delete this[i]);
-      });
-      this.length = 1;
-      return this;
+      return bonzo(this[0]);
     },
 
     last: function () {
-      this.elements = [this[this.length - 1]];
-      this[0] = this.elements[0];
-      this.each(function (el, i) {
-        i && (delete this[i]);
-      });
-      this.length = 1;
-      return this;
+      return bonzo(this[this.length - 1]);
     },
 
     html: function (html) {
@@ -2707,6 +2716,14 @@ $._select = qwery.noConflict();
           return classReg(el).test(i.className);
         }) :
         classReg(c).test(el.className);
+    },
+
+    toggleClass: function (c) {
+      return this.each(function (el) {
+        this.hasClass(el, c) ?
+          (el.className = trim(el.className.replace(classReg(c), ' '))) :
+          (el.className = trim(el.className + ' ' + c));
+      });
     },
 
     show: function (elements) {
@@ -2753,7 +2770,7 @@ $._select = qwery.noConflict();
     },
 
     related: function (method) {
-      this.elements = this.map(
+      return bonzo(this.map(
         function (el) {
           el = el[method];
           while (el && el.nodeType !== 1) {
@@ -2764,8 +2781,7 @@ $._select = qwery.noConflict();
         function (el) {
           return el;
         }
-      );
-      return this;
+      ));
     },
 
     prependTo: function (target) {
@@ -2834,6 +2850,30 @@ $._select = qwery.noConflict();
         this.each(function (el) {
           el.setAttribute(k, v);
         });
+    },
+
+    removeAttr: function (k) {
+      return this.each(function (el) {
+        el.removeAttribute(k);
+      });
+    },
+
+    data: function (k, v) {
+      var el = this.elements[0];
+      if (typeof v === 'undefined') {
+        el.getAttribute('data-node-uid') || el.setAttribute('data-node-uid', ++uuids);
+        var uid = el.getAttribute('data-node-uid');
+        uidList[uid] || (uidList[uid] = {});
+        return uidList[uid][k];
+      } else {
+        return this.each(function (el) {
+          el.getAttribute('data-node-uid') || el.setAttribute('data-node-uid', ++uuids);
+          var uid = el.getAttribute('data-node-uid');
+          var o = {};
+          o[k] = v;
+          uidList[uid] = o;
+        });
+      }
     },
 
     remove: function () {
@@ -2975,9 +3015,36 @@ $._select = qwery.noConflict();
       return $(b.create(node));
     }
   });
+  function uniq(ar) {
+    var a = [], i, j;
+    label:
+    for (i = 0; i < ar.length; i++) {
+      for (j = 0; j < a.length; j++) {
+        if (a[j] == ar[i]) {
+          continue label;
+        }
+      }
+      a[a.length] = ar[i];
+    }
+    return a;
+  }
+  $.ender({
+    parents: function (selector) {
+      var collection = $(selector), i, l, j, k, r = [];
+      collect:
+      for (i = 0, l = collection.length; i < l; i++) {
+        for (j = 0, k = this.length; j < k; j++) {
+          if (b.isAncestor(collection[i], this[j])) {
+            r.push(collection[i]);
+            continue collect;
+          }
+        }
+      }
+      return b(uniq(collection));
+    }
+  }, true);
 
 }();
-
 
 /*!
   * bean.js - copyright @dedfat
