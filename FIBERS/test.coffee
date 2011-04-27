@@ -32,37 +32,39 @@ class Obj
 
 	type: @type = 0
 
-	constructor: (id, uid) ->
+	constructor: (id, user) ->
 		id = sanitize id
 		id = nonce() unless id
 		@id = "#{@type}:#{id}"
-		@uid = uid
+		@user = user
 
 	save: (data = {}) ->
 		if db.setnx.sync db, @id, JSON.stringify data
 			date = Date.now()
 			args = []
-			args.push ['zadd', 'o.index', date, @id]
-			args.push ['zadd', 'o.type', @type, @id]
-			args.push ['set', "#{@id}:uid", @uid]
-			args.push ['zadd', "#{@uid}:o.index", date, @id]
-			args.push ['zadd', "#{@uid}:o.type", @type, @id]
+			args.push ['zadd', 'index', date, @id]
+			args.push ['zadd', 'typed', @type, @id]
+			if @user
+				args.push ['set', "#{@id}:user", @user]
+				args.push ['sadd', "#{@user}:index", @id]
+				#args.push ['zadd', "#{@user}:index", date, @id]
+				#args.push ['zadd', "#{@user}:typed", @type, @id]
 			exec args
 		else
 			undefined
 
-	load: (uid) ->
+	load: (asUser) ->
 		# TODO: determine if its owner then load all, else forbid
 		reply = exec [
-			['mget', @id, "#{@id}:uid"]
+			['mget', @id, "#{@id}:user"]
 		]
 		data = if data then JSON.parse data else {}
 
 	setAccess: (access) ->
-		args = [
-			['zadd', 'o.access', access, @id]
-			['zadd', "#{@uid}:o.access", access, @id]
-		]
+		args = []
+		args.push ['zadd', 'access', access, @id]
+		if @user
+			args.push ['zadd', "#{@user}:access", access, @id]
 		exec args
 
 	tag: (tags) ->
@@ -72,7 +74,7 @@ class Obj
 			args.push.apply args, [
 				['set', "tag:#{id}", tag]
 				['sadd', "#{@id}:tags", id]
-				['sadd', "o.tags:#{id}", @id]
+				['sadd', "tags:#{id}", @id]
 			]
 		, @
 		exec args
@@ -82,7 +84,7 @@ class Obj
 		_.each tags, (tag) ->
 			id = sha1 tag
 			args.push.apply args, [
-				['srem', "o.tags:#{id}", @id]
+				['srem', "tags:#{id}", @id]
 				['srem', "#{@id}:tags", id]
 				['del', "tag:#{id}"]
 			]
@@ -96,53 +98,89 @@ class Obj
 		tags = db.mget.sync db, _.map tags, (tag) -> "tag:#{tag}"
 		#console.log 'TAGS', tags
 
-	vote: (value) ->
-		args = [
-			if value then ['zadd', "vote:#{@id}", value, @uid] else ['zrem', "vote:#{@id}", @uid]
-			if value then ['zadd', "#{@id}:votes", value, @uid] else ['zrem', "#{@id}:votes", @uid]
-		]
-		exec args
+	# get ids of users which have voted for this object
+	votes: (min = 0, max = '+inf') ->
+		db.zrangebyscore.sync db, "#{@id}:votes", min, max
 
-	getTags: () ->
-		tags = db.smembers.sync db, "#{@id}:tags"
-		tags = db.mget.sync db, _.map tags, (tag) -> "tag:#{tag}"
+	# get this object rating == average of all user votes for this object
+	rating: (min = 0, max = '+inf') ->
+		cached = db.get.sync db, "#{@id}:rating"
+		unless cached
+			#cached = db.zinterstore.sync db, "#{@id}:rating", 1, "#{@id}:votes", 'aggregate'
+			cached = db.zrangebyscore.sync db, "#{@id}:votes", min, max, 'withscores'
+			# TODO: sum every second element, divide the sum over the count
+			db.set.sync db, "#{@id}:rating", cached
+		cached
 
-	getVotes: (min = 0, max = '+inf') ->
-		db.zrangebyscore.sync db, "#{@id}:votes", min, max, 'withscores'
-
-	@index: () ->
-		db.zrangebyscore.sync db, 'o.type', @type, @type
+	getUser: () ->
+		user = db.get.sync db, "#{@id}:user"
 
 	@findByAllTags: (tags) ->
-		db.sinter.sync db, _.map tags, (tag) -> "o.tags:#{sha1(tag)}"
+		db.sinter.sync db, _.map tags, (tag) -> "tags:#{sha1(tag)}"
 
 	@findByAnyTag: (tags) ->
-		db.sunion.sync db, _.map tags, (tag) -> "o.tags:#{sha1(tag)}"
+		db.sunion.sync db, _.map tags, (tag) -> "tags:#{sha1(tag)}"
 
-class Foo extends Obj
+	@findByDate: (date1, date2 = date1) ->
+		db.zrangebyscore.sync db, 'index', date1, date2
 
-	type: @type = 1
+	@findByType: (type1, type2 = type1) ->
+		db.zrangebyscore.sync db, 'typed', type1, type2
+
+	@filter: (date, type, access, tags, options = {}) ->
+		sets = []
+		if date?
+			sets.push "obd:#{date}"
+		if type?
+			sets.push "obt:#{type}"
+		if access?
+			sets.push "oba:#{access}"
+		if Array.isArray tags
+			sets.push.apply sets, _.map tags, (tag) -> "tags:#{sha1(tag)}"
+		options.op ?= 'and'
+		console.log 'FILTER', sets
+		db[if options.op is 'and' then 'sinter' else 'sunion'].sync db, sets
 
 class User extends Obj
 
 	type: @type = 9
 
-	constructor: (id) ->
-		id = sanitize id
-		id = nonce() unless id
-		@id = "#{@type}:#{id}"
-		@uid = 0
+	constructor: (id, user) ->
+		super id, user
 
-	follow: (uid) ->
+	# vote for object `oid` with value `value`
+	vote: (oid, value) ->
+		if value
+			# TODO: reduce to 2?
+			args = [
+				['zadd', "vote:#{oid}", value, @id]
+				['zadd', "#{oid}:votes", value, @id]
+				['zadd', "vote:#{id}", value, oid]
+				['zadd', "#{id}:votes", value, oid]
+			]
+		else
+			args = [
+				['zrem', "#{id}:votes", oid]
+				['zrem', "vote:#{id}", oid]
+				['zrem', "#{oid}:votes", @id]
+				['zrem', "vote:#{oid}", @id]
+			]
+		exec args
+
+	# get ids of objects for which this user has voted
+	votes: (min = 0, max = '+inf') ->
+		db.zrangebyscore.sync db, "vote:#{id}", min, max #, 'withscores'
+
+	follow: (user) ->
 		exec [
-			['sadd', "#{@id}:follows", uid]
-			['sadd', "#{uid}:followers", @id]
+			['sadd', "#{@id}:follows", user]
+			['sadd', "#{user}:followers", @id]
 		]
 
-	unfollow: (uid) ->
+	unfollow: (user) ->
 		exec [
-			['srem', "#{@id}:follows", uid]
-			['srem', "#{uid}:followers", @id]
+			['srem', "#{@id}:follows", user]
+			['srem', "#{user}:followers", @id]
 		]
 
 	follows: () ->
@@ -154,6 +192,19 @@ class User extends Obj
 	friends: () ->
 		db.sinter.sync db, "#{@id}:follows", "#{@id}:followers"
 
+	createObj: (id) ->
+		obj = new Obj id, @id
+
+	createFoo: (id) ->
+		obj = new Foo id, @id
+
+	createUser: (id) ->
+		obj = new User id, @id
+
+class Foo extends Obj
+
+	type: @type = 1
+
 S () ->
 
 	db.flushall.sync db
@@ -161,31 +212,15 @@ S () ->
 	user1 = new User 'aaa'
 	user1.save()
 
-	user2 = new User 'aaa'
+	user2 = new User 'bbb'
 	user2.save()
 
-	obj1 = new Foo null, 'u:hz'
-	obj1.save foo: 'bar'
-	obj1.tag ['bar', 'baz', 'sole']
-	#console.log obj1.getTags()
-	obj1.untag ['baz', 'foo']
-	#console.log obj1.getTags()
-	obj1.vote 1
-	obj1.vote()
-	#exec [['zrange', ]]
+	user3 = user1.createUser 'ccc'
+	user3.save()
 
-	obj2 = new Obj null, 'u:hz'
-	obj2.save bar: 'baz'
-	obj2.tag ['bar', 'fubar']
-	obj2.vote 1
-	obj2.vote 9
-	obj2.vote 2
-	obj2.vote 3
+	user3.vote user2.id, 5
+	user3.tag ['mysub', 'user3']
 
-	#exec [ ['smembers', 'tags'] ]
-
-	#obj1.load 'u:a'
-	#Obj.index()
-	console.log 'AAA', Obj.findByAllTags ['sole']
-	console.log 'III', Obj.findByAnyTag ['sole', 'bar']
-	console.log obj2.getVotes()
+	#console.log Obj.findByAnyTag ['mysub']
+	#console.log Obj.filter null, 9, null, null #['mysub']
+	console.log Obj.filter null, 9, null, null #['mysub']
