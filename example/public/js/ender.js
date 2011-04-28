@@ -1,20 +1,20 @@
 /*!
-  * Ender.js: a small, powerful JavaScript library composed of application agnostic submodules
+  * Ender: open module JavaScript framework
   * copyright Dustin Diaz & Jacob Thornton 2011 (@ded @fat)
-  * https://github.com/ded/Ender.js
+  * https://github.com/ender-js/ender
   * License MIT
-  * Build: ender -j jeesh underscore-data
+  * Build: ender build jeesh underscore-data
   */
 !function (context) {
 
   function aug(o, o2) {
     for (var k in o2) {
-      o[k] = o2[k];
+      k != 'noConflict' && (o[k] = o2[k]);
     }
   }
 
   function _$(s, r) {
-    this.elements = $._select(s, r);
+    this.elements = typeof s !== 'string' && !s.nodeType && typeof s.length !== 'undefined' ? s : $._select(s, r);
     this.length = this.elements.length;
     for (var i = 0; i < this.length; i++) {
       this[i] = this.elements[i];
@@ -45,7 +45,7 @@
     (context.$ = $);
 
 }(this);
-!function () { var module = { exports: {} }; !function (doc) {
+!function () { var exports = {}, module = { exports: exports }; !function (doc) {
   var loaded = 0, fns = [], ol, f = false,
       testEl = doc.createElement('a'),
       domContentLoaded = 'DOMContentLoaded',
@@ -99,7 +99,7 @@
       (window.domReady = domReady);
 
 }(document); $.ender(module.exports); }();
-!function () { var module = { exports: {} }; //     Underscore.js 1.1.6
+!function () { var exports = {}, module = { exports: exports }; //     Underscore.js 1.1.6
 //     (c) 2011 Jeremy Ashkenas, DocumentCloud Inc.
 //     Underscore is freely distributable under the MIT license.
 //     Portions of Underscore are inspired or borrowed from Prototype,
@@ -907,7 +907,7 @@
 
 })();
  $.ender(module.exports); }();
-!function () { var module = { exports: {} }; (function() {
+!function () { var exports = {}, module = { exports: exports }; (function() {
   var Query, autoConverted, coerce, converters, encodeString, encodeValue, jsOperatorMap, operatorMap, operators, parse, plusMinus, query, queryToString, requires_array, stringToValue, stringify, valid_funcs, valid_operators, validate;
   var __slice = Array.prototype.slice, __hasProp = Object.prototype.hasOwnProperty;
   if (this._ === void 0 && this.$ !== void 0 && $.ender) {
@@ -2587,9 +2587,22 @@
   context.qwery = qwery;
 
 }(this, document);
-!function () {
+!function (doc) {
   var q = qwery.noConflict();
-  $._select = q;
+  function create(node, root) {
+    var el = (root || doc).createElement('div'), els = [];
+    el.innerHTML = node;
+    var nodes = el.childNodes;
+    el = el.firstChild;
+    els.push(el);
+    while (el = el.nextSibling) {
+      (el.nodeType == 1) && els.push(el);
+    }
+    return els;
+  };
+  $._select = function (s, r) {
+    return /^\s*</.test(s) ? create(s, r) : q(s, r);
+  };
   $.ender({
     find: function (s) {
       var r = [], i, l, j, k, els;
@@ -2602,7 +2615,7 @@
       return $(q.uniq(r));
     }
   }, true);
-}();
+}(document);
 /*!
   * bonzo.js - copyright @dedfat 2011
   * https://github.com/ded/bonzo
@@ -2652,11 +2665,24 @@
     return false;
   }
 
+  function sucks(o) {
+    for (var k in o) {
+      switch (k) {
+      case 'opacity':
+        o.filter = 'alpha(opacity=' + (o[k] * 100) + ')';
+        delete o[k];
+        break;
+      case '':
+        break;
+      }
+    }
+  }
+
   function _bonzo(elements) {
     this.elements = [];
     this.length = 0;
     if (elements) {
-      this.elements = Object.prototype.hasOwnProperty.call(elements, 'length') ? elements : [elements];
+      this.elements = typeof elements !== 'string' && !elements.nodeType && typeof elements.length !== 'undefined' ? elements : [elements];
       this.length = this.elements.length;
       for (var i = 0; i < this.length; i++) {
         this[i] = this.elements[i];
@@ -2691,7 +2717,7 @@
     },
 
     html: function (html) {
-      return typeof html == 'string' ?
+      return typeof html !== 'undefined' ?
         this.each(function (el) {
           el.innerHTML = html;
         }) :
@@ -2718,7 +2744,10 @@
         classReg(c).test(el.className);
     },
 
-    toggleClass: function (c) {
+    toggleClass: function (c, condition) {
+      if (typeof condition !== 'undefined' && !condition) {
+        return this;
+      }
       return this.each(function (el) {
         this.hasClass(el, c) ?
           (el.className = trim(el.className.replace(classReg(c), ' '))) :
@@ -2740,7 +2769,7 @@
 
     append: function (node) {
       return this.each(function (el) {
-        each(bonzo.create(node), function (i) {
+        each(normalize(node), function (i) {
           el.appendChild(i);
         });
       });
@@ -2749,7 +2778,7 @@
     prepend: function (node) {
       return this.each(function (el) {
         var first = el.firstChild;
-        each(bonzo.create(node), function (i) {
+        each(normalize(node), function (i) {
           el.insertBefore(i, first);
         });
       });
@@ -2770,7 +2799,7 @@
     },
 
     related: function (method) {
-      return bonzo(this.map(
+      return this.map(
         function (el) {
           el = el[method];
           while (el && el.nodeType !== 1) {
@@ -2781,7 +2810,7 @@
         function (el) {
           return el;
         }
-      ));
+      );
     },
 
     prependTo: function (target) {
@@ -2798,6 +2827,22 @@
       });
     },
 
+    insertBefore: function (node) {
+      return this.each(function (el) {
+        each(normalize(node), function (n) {
+          n.parentNode.insertBefore(el, n);
+        });
+      });
+    },
+
+    insertAfter: function (node) {
+      return this.each(function (el) {
+        each(normalize(node), function (n) {
+          n.parentNode.insertBefore(el, (n.nextSibling || n));
+        });
+      });
+    },
+
     after: function (node) {
       return this.each(function (el) {
         each(bonzo.create(node), function (i) {
@@ -2810,15 +2855,17 @@
       if (v === undefined && typeof o == 'string') {
         return this[0].style[camelize(o)];
       }
-      var fn = typeof o == 'string' ?
-        function (el) {
-          el.style[camelize(o)] = v;
-        } :
-        function (el) {
-          for (var k in o) {
-            o.hasOwnProperty(k) && (el.style[camelize(k)] = o[k]);
-          }
-        };
+      var iter = o;
+      if (typeof o == 'string') {
+        iter = {};
+        iter[o] = v;
+      }
+      ie && sucks(iter);
+      var fn = function (el) {
+        for (var k in iter) {
+          iter.hasOwnProperty(k) && (el.style[camelize(k)] = iter[k]);
+        }
+      };
       return this.each(fn);
     },
 
@@ -2902,9 +2949,64 @@
 
     scrollLeft: function (x) {
       return scroll.call(this, x, null, 'x');
-    }
+    },
 
+    serialize: function () {
+      var form = this[0],
+          inputs = form.getElementsByTagName('input'),
+          selects = form.getElementsByTagName('select'),
+          texts = form.getElementsByTagName('textarea');
+      return (bonzo(inputs).map(serial).join('') +
+      bonzo(selects).map(serial).join('') +
+      bonzo(texts).map(serial).join('')).replace(/&$/, '');
+    },
+
+    serializeArray: function () {
+      for (var pairs = this.serialize().split('&'), i = 0, l = pairs.length, r = [], o; i < l; i++) {
+        pairs[i] && (o = pairs[i].split('=')) && r.push({name: o[0], value: o[1]});
+      }
+      return r;
+    }
   };
+
+  function enc(v) {
+    return encodeURIComponent(v);
+  }
+
+  function serial(el) {
+    var n = el.name;
+    // don't serialize elements that are disabled or without a name
+    if (el.disabled || !n) {
+      return '';
+    }
+    n = enc(n);
+    switch (el.tagName.toLowerCase()) {
+    case 'input':
+      switch (el.type) {
+      case 'reset':
+      case 'button':
+      case 'image':
+      case 'file':
+        return '';
+      case 'checkbox':
+      case 'radio':
+        return el.checked ? n + '=' + (el.value ? enc(el.value) : true) + '&' : '';
+      default: // text hidden password submit
+        return n + '=' + (el.value ? enc(el.value) : true) + '&';
+      }
+      break;
+    case 'textarea':
+      return n + '=' + enc(el.value) + '&';
+    case 'select':
+      // @todo refactor beyond basic single selected value case
+      return n + '=' + enc(el.options[el.selectedIndex].value) + '&';
+    }
+    return '';
+  }
+
+  function normalize(node) {
+    return typeof node == 'string' ? bonzo.create(node) : is(node) ? [node] : node;
+  }
 
   function scroll(x, y, type) {
     var el = this.elements[0];
@@ -3015,6 +3117,16 @@
       return $(b.create(node));
     }
   });
+
+  function indexOf(ar, val) {
+    for (var i = 0; i < ar.length; i++) {
+      if ( ar[i] === val ) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
   function uniq(ar) {
     var a = [], i, j;
     label:
@@ -3029,23 +3141,200 @@
     return a;
   }
   $.ender({
-    parents: function (selector) {
-      var collection = $(selector), i, l, j, k, r = [];
-      collect:
-      for (i = 0, l = collection.length; i < l; i++) {
-        for (j = 0, k = this.length; j < k; j++) {
-          if (b.isAncestor(collection[i], this[j])) {
-            r.push(collection[i]);
-            continue collect;
+    parents: function (selector, closest) {
+      var collection = $(selector), j, k, p, r = [];
+      for (j = 0, k = this.length; j < k; j++) {
+        p = this[j];
+        while (p = p.parentNode) {
+          if (indexOf(collection, p) !== -1) {
+            r.push(p);
+            if (closest) break;
           }
         }
       }
-      return b(uniq(collection));
+      return $(uniq(r));
+    },
+
+    closest: function (selector) {
+      return this.parents(selector, true);
+    },
+
+    first: function () {
+      return $(this[0]);
+    },
+
+    last: function () {
+      return $(this[this.length - 1]);
+    },
+
+    next: function () {
+      return $(b(this).next());
+    },
+
+    previous: function () {
+      return $(b(this).previous());
+    },
+
+    siblings: function () {
+      var i, l, p, r = [];
+      for (i = 0, l = this.length; i < l; i++) {
+        p = this[i];
+        while (p = p.previousSibling) {
+          p.nodeType == 1 && r.push(p);
+        }
+        p = this[i];
+        while (p = p.nextSibling) {
+          p.nodeType == 1 && r.push(p);
+        }
+      }
+      return $(uniq(r));
     }
   }, true);
 
 }();
 
+/*!
+  * Reqwest! A x-browser general purpose XHR connection manager
+  * copyright Dustin Diaz 2011
+  * https://github.com/ded/reqwest
+  * license MIT
+  */
+!function (context) {
+  var twoHundo = /^20\d$/,
+      xhr = ('XMLHttpRequest' in window) ?
+        function () {
+          return new XMLHttpRequest();
+        } :
+        function () {
+          return new ActiveXObject('Microsoft.XMLHTTP');
+        };
+
+  function readyState(o, success, error) {
+    return function () {
+      if (o && o.readyState == 4) {
+        if (twoHundo.test(o.status)) {
+          success(o);
+        } else {
+          error(o);
+        }
+      }
+    };
+  }
+
+  function setHeaders(http, options) {
+    var headers = options.headers || {};
+    headers.Accept = 'text/javascript, text/html, application/xml, text/xml, */*';
+    if (options.data) {
+      headers['Content-type'] = 'application/x-www-form-urlencoded';
+      for (var h in headers) {
+        headers.hasOwnProperty(h) && http.setRequestHeader(h, headers[h], false);
+      }
+    }
+  }
+
+  function getRequest(o, fn, err) {
+    var http = xhr();
+    http.open(o.method || 'GET', typeof o == 'string' ? o : o.url, true);
+    setHeaders(http, o);
+    http.onreadystatechange = readyState(http, fn, err);
+    o.before && o.before(http);
+    http.send(o.data || null);
+    return http;
+  }
+
+  function Reqwest(o, fn) {
+    this.o = o;
+    this.fn = fn;
+    init.apply(this, arguments);
+  }
+
+  function setType(url) {
+    if (/\.json$/.test(url)) {
+      return 'json';
+    }
+    if (/\.js$/.test(url)) {
+      return 'js';
+    }
+    if (/\.html?$/.test(url)) {
+      return 'html';
+    }
+    if (/\.xml$/.test(url)) {
+      return 'xml';
+    }
+    return 'js';
+  }
+
+  function init(o, fn) {
+    this.url = typeof o == 'string' ? o : o.url;
+    this.timeout = null;
+    var type = o.type || setType(this.url), self = this;
+    fn = fn || function () {};
+
+    if (o.timeout) {
+      this.timeout = setTimeout(function () {
+        self.abort();
+        error();
+      }, o.timeout);
+    }
+
+    function complete(resp) {
+      o.complete && o.complete(resp);
+    }
+
+    function success(resp) {
+      o.timeout && clearTimeout(self.timeout) && (self.timeout = null);
+      var r = resp.responseText;
+
+      switch (type) {
+      case 'json':
+        resp = eval('(' + r + ')');
+        break;
+      case 'js':
+        resp = eval(r);
+        break;
+      case 'html':
+        resp = r;
+        break;
+      // default is the response from server
+      }
+
+      fn(resp);
+      o.success && o.success(resp);
+      complete(resp);
+    }
+
+    function error(resp) {
+      o.error && o.error(resp);
+      complete(resp);
+    }
+
+    this.request = getRequest(o, success, error);
+  }
+
+  Reqwest.prototype = {
+    abort: function () {
+      this.request.abort();
+    },
+
+    retry: function () {
+      init.call(this, this.o, this.fn);
+    }
+  };
+
+  function reqwest(o, fn) {
+    return new Reqwest(o, fn);
+  }
+
+  var old = context.reqwest;
+  reqwest.noConflict = function () {
+    context.reqwest = old;
+    return this;
+  };
+  context.reqwest = reqwest;
+
+}(this);$.ender({
+  ajax: reqwest.noConflict()
+});
 /*!
   * bean.js - copyright @dedfat
   * https://github.com/fat/bean
@@ -3064,9 +3353,13 @@
       addEvent = 'addEventListener',
       attachEvent = 'attachEvent',
       removeEvent = 'removeEventListener',
-      detachEvent = 'detachEvent';
+      detachEvent = 'detachEvent',
+      doc = context.document || {},
+      root = doc.documentElement || {},
+      W3C_MODEL = root[addEvent],
+      eventSupport = W3C_MODEL ? addEvent : attachEvent,
 
-  function isDescendant(parent, child) {
+  isDescendant = function (parent, child) {
     var node = child.parentNode;
     while (node != null) {
       if (node == parent) {
@@ -3074,52 +3367,53 @@
       }
       node = node.parentNode;
     }
-  }
+  },
 
-  function retrieveEvents(element) {
+  retrieveUid = function (obj, uid) {
+    return (obj.__uid = uid || obj.__uid || __uid++);
+  },
+
+  retrieveEvents = function (element) {
     var uid = retrieveUid(element);
     return (registry[uid] = registry[uid] || {});
-  }
+  },
 
-  function retrieveUid(obj, uid) {
-    return (obj.__uid = uid || obj.__uid || __uid++);
-  }
+  listener = W3C_MODEL ? function (element, type, fn, add) {
+    element[add ? addEvent : removeEvent](type, fn, false);
+  } : function (element, type, fn, add, custom) {
+    custom && add && (element['_on' + custom] = element['_on' + custom] || 0);
+    element[add ? attachEvent : detachEvent]('on' + type, fn);
+  },
 
-  function listener(element, type, fn, add, custom) {
-    if (element[addEvent]) {
-      element[add ? addEvent : removeEvent](type, fn, false);
-    } else if (element[attachEvent]) {
-      custom && add && (element['_on' + custom] = element['_on' + custom] || 0);
-      element[add ? attachEvent : detachEvent]('on' + type, fn);
-    }
-  }
-
-  function nativeHandler(element, fn, args) {
+  nativeHandler = function (element, fn, args) {
     return function (event) {
       event = fixEvent(event || ((this.ownerDocument || this.document || this).parentWindow || context).event);
       return fn.apply(element, [event].concat(args));
     };
-  }
+  },
 
-  function customHandler(element, fn, type, condition, args) {
+  customHandler = function (element, fn, type, condition, args) {
     return function (event) {
       if (condition ? condition.call(this, event) : event && event.propertyName == '_on' + type || !event) {
         fn.apply(element, [event].concat(args));
       }
     };
-  }
+  },
 
-  function addListener(element, orgType, fn, args) {
-    var type = orgType.replace(stripName, ''), events = retrieveEvents(element),
+  addListener = function (element, orgType, fn, args) {
+    var type = orgType.replace(stripName, ''),
+        events = retrieveEvents(element),
         handlers = events[type] || (events[type] = {}),
         uid = retrieveUid(fn, orgType.replace(namespace, ''));
     if (handlers[uid]) {
       return element;
     }
     var custom = customEvents[type];
-    fn = custom && custom.condition ? customHandler(element, fn, type, custom.condition) : fn;
-    type = custom && custom.base || type;
-    var isNative = context[addEvent] || nativeEvents.indexOf(type) > -1;
+    if (custom) {
+      fn = custom.condition ? customHandler(element, fn, type, custom.condition) : fn;
+      type = custom.base || type;
+    }
+    var isNative = W3C_MODEL || nativeEvents.indexOf(type) > -1;
     fn = isNative ? nativeHandler(element, fn, args) : customHandler(element, fn, type, false, args);
     if (type == 'unload') {
       var org = fn;
@@ -3127,13 +3421,13 @@
         removeListener(element, type, fn) && org();
       };
     }
-    listener(element, isNative ? type : 'propertychange', fn, true, !isNative && true);
+    element[eventSupport] && listener(element, isNative ? type : 'propertychange', fn, true, !isNative && type);
     handlers[uid] = fn;
     fn.__uid = uid;
     return type == 'unload' ? element : (collected[retrieveUid(element)] = element);
-  }
+  },
 
-  function removeListener(element, orgType, handler) {
+  removeListener = function (element, orgType, handler) {
     var uid, names, uids, i, events = retrieveEvents(element), type = orgType.replace(stripName, '');
     if (!events || !events[type]) {
       return element;
@@ -3144,14 +3438,16 @@
       uid = uids[i];
       handler = events[type][uid];
       delete events[type][uid];
-      type = customEvents[type] ? customEvents[type].base : type;
-      var isNative = element[addEvent] || nativeEvents.indexOf(type) > -1;
-      listener(element, isNative ? type : 'propertychange', handler, false, !isNative && type);
+      if (element[eventSupport]) {
+        type = customEvents[type] ? customEvents[type].base : type;
+        var isNative = element[addEvent] || nativeEvents.indexOf(type) > -1;
+        listener(element, isNative ? type : 'propertychange', handler, false, !isNative && type);
+      }
     }
     return element;
-  }
+  },
 
-  function del(selector, fn, $) {
+  del = function (selector, fn, $) {
     return function (e) {
       var array = typeof selector == 'string' ? $(selector, this) : selector;
       for (var target = e.target; target && target != this; target = target.parentNode) {
@@ -3162,9 +3458,9 @@
         }
       }
     };
-  }
+  },
 
-  function add(element, events, fn, delfn, $) {
+  add = function (element, events, fn, delfn, $) {
     if (typeof events == 'object' && !fn) {
       for (var type in events) {
         events.hasOwnProperty(type) && add(element, type, events[type]);
@@ -3177,9 +3473,9 @@
       }
     }
     return element;
-  }
+  },
 
-  function remove(element, orgEvents, fn) {
+  remove = function (element, orgEvents, fn) {
     var k, type, events,
         isString = typeof(orgEvents) == 'string',
         names = isString && orgEvents.replace(namespace, ''),
@@ -3208,9 +3504,9 @@
       }
     }
     return element;
-  }
+  },
 
-  function fire(element, type) {
+  fire = function (element, type) {
     var evt, k, i, types = type.split(' ');
     for (i = types.length; i--;) {
       type = types[i].replace(stripName, '');
@@ -3222,12 +3518,8 @@
         for (k = isNamespace.length; k--;) {
           handlers[isNamespace[k]] && handlers[isNamespace[k]]();
         }
-      } else if (element[addEvent]) {
-        evt = document.createEvent(isNative ? "HTMLEvents" : "UIEvents");
-        evt[isNative ? 'initEvent' : 'initUIEvent'](type, true, true, context, 1);
-        element.dispatchEvent(evt);
-      } else if (element[attachEvent]) {
-        isNative ? element.fireEvent('on' + type, document.createEventObject()) : element['_on' + type]++;
+      } else if (element[eventSupport]) {
+        fireListener(isNative, type, element);
       } else {
         for (k in handlers) {
           handlers.hasOwnProperty(k) && handlers[k]();
@@ -3235,18 +3527,26 @@
       }
     }
     return element;
-  }
+  },
 
-  function clone(element, from, type) {
+  fireListener = W3C_MODEL ? function (isNative, type, element) {
+    evt = document.createEvent(isNative ? "HTMLEvents" : "UIEvents");
+    evt[isNative ? 'initEvent' : 'initUIEvent'](type, true, true, context, 1);
+    element.dispatchEvent(evt);
+  } : function (isNative, type, element) {
+    isNative ? element.fireEvent('on' + type, document.createEventObject()) : element['_on' + type]++;
+  },
+
+  clone = function (element, from, type) {
     var events = retrieveEvents(from), obj, k;
     obj = type ? events[type] : events;
     for (k in obj) {
       obj.hasOwnProperty(k) && (type ? add : clone)(element, type || from, type ? obj[k] : k);
     }
     return element;
-  }
+  },
 
-  function fixEvent(e) {
+  fixEvent = function (e) {
     var result = {};
     if (!e) {
       return result;
@@ -3275,7 +3575,7 @@
       }
     }
     return result;
-  }
+  };
 
   fixEvent.preventDefault = function (e) {
     return function () {
@@ -3287,6 +3587,7 @@
       }
     };
   };
+
   fixEvent.stopPropagation = function (e) {
     return function () {
       if (e.stopPropagation) {
@@ -3359,6 +3660,7 @@
           for (var args, i = 0, l = this.elements.length; i < l; i++) {
             args = [this.elements[i]].concat(_args, Array.prototype.slice.call(arguments, 0));
             args.length == 4 && args.push($);
+            !arguments.length && method == 'add' && type && (method = 'fire');
             b[method].apply(this, args);
           }
           return this;
@@ -3410,134 +3712,6 @@
 
   $.ender(methods, true);
 }();
-/*!
-  * Boom. Ajax! Ever heard of it!?
-  * copyright 2011 @dedfat
-  * https://github.com/ded/reqwest
-  * license MIT
-  */
-!function (context) {
-  var twoHundo = /^20\d$/,
-      xhr = ('XMLHttpRequest' in window) ?
-        function () {
-          return new XMLHttpRequest();
-        } :
-        function () {
-          return new ActiveXObject('Microsoft.XMLHTTP');
-        };
-
-  function readyState(o, success, error) {
-    return function () {
-      if (o && o.readyState == 4) {
-        if (twoHundo.test(o.status)) {
-          success(o);
-        } else {
-          error(o);
-        }
-      }
-    };
-  }
-
-  function setHeaders(http, options) {
-    var headers = options.headers;
-    if (headers && options.data) {
-      for (var h in headers) {
-        http.setRequestHeader(h, headers[h], false);
-      }
-    }
-  }
-
-  function getRequest(o, fn, err) {
-    var http = xhr();
-    http.open(o.method || 'GET', typeof o == 'string' ? o : o.url, true);
-    setHeaders(http, o);
-    http.onreadystatechange = readyState(http, fn, err);
-    o.before && o.before(http);
-    http.send(o.data || null);
-    return http;
-  }
-
-  function Reqwest(o, fn) {
-    this.o = o;
-    this.fn = fn;
-    init.apply(this, arguments);
-  }
-
-  function setType(url) {
-    if (/\.json$/.test(url)) {
-      return 'json';
-    }
-    if (/\.js$/.test(url)) {
-      return 'js';
-    }
-    if (/\.html?$/.test(url)) {
-      return 'html';
-    }
-    if (/\.xml$/.test(url)) {
-      return 'xml';
-    }
-    return 'js';
-  }
-
-  function init(o, fn) {
-    this.url = typeof o == 'string' ? o : o.url;
-    this.timeout = null;
-    var type = o.type || setType(this.url), self = this;
-    fn = fn || function () {};
-
-    if (o.timeout) {
-      this.timeout = setTimeout(function () {
-        self.abort();
-        error();
-      }, o.timeout);
-    }
-
-    function complete(resp) {
-      o.complete && o.complete(resp);
-    }
-
-    function success(resp) {
-      o.timeout && clearTimeout(self.timeout) && (self.timeout = null);
-      var r = resp.responseText,
-          val = /json$/i.test(type) ? JSON.parse(r) : r;
-      /^js$/i.test(type) && eval(r);
-      fn(o);
-      o.success && o.success(val);
-      complete(val);
-    }
-
-    function error(resp) {
-      o.error && o.error(resp);
-      complete(resp);
-    }
-
-    this.request = getRequest(o, success, error);
-  }
-
-  Reqwest.prototype = {
-    abort: function () {
-      this.request.abort();
-    },
-
-    retry: function () {
-      init.call(this, this.o, this.fn);
-    }
-  };
-
-  function reqwest(o, fn) {
-    return new Reqwest(o, fn);
-  }
-
-  var old = context.reqwest;
-  reqwest.noConflict = function () {
-    context.reqwest = old;
-    return this;
-  };
-  context.reqwest = reqwest;
-
-}(this);$.ender({
-  ajax: reqwest.noConflict()
-});
 /*!
   * emile.js (c) 2009 - 2011 Thomas Fuchs
   * Licensed under the terms of the MIT license.

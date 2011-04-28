@@ -104,7 +104,7 @@ var fallbackContext = function(context) {
 		http.on('request', middleware);
 		http.listen(config.server.port);
 		var now_http = nowjs.initialize(http);
-		now_http.now.demo = function(callback) {
+		/*now_http.now.demo = function(callback) {
 			console.log('DEMOHTTP');
 		}
 		now_http.connected(function() {
@@ -113,14 +113,14 @@ var fallbackContext = function(context) {
 		now_http.disconnected(function() {
 			//console.log("Left: " + this.now);
 		});
-		_.extend(now_http.now, nowjs.client);
+		_.extend(now_http.now, nowjs.client);*/
 	}
-	_.extend(now_http.now, {
+	/*_.extend(now_http.now, {
 		act: function(s) {
 			console.log(this);
 			this.now.flash(s);
 		}
-	});
+	});*/
 
 	//
 	// reuse the middleware for HTTPS server
@@ -139,5 +139,16 @@ var fallbackContext = function(context) {
 		}
 		_.extend(now_https.now, nowjs.client);
 	}
+
+	//
+	// compare to DNode
+	//
+	/*var DNode = require('dnode');
+	var dnode = DNode({
+		zing: function(n, cb) {
+			cb(n * 100)
+		}
+	});
+	dnode.listen(http);*/
 
 });

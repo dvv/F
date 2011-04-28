@@ -50,11 +50,12 @@ class Obj
 			undefined
 
 	@load: (id) ->
-		reply = db.mget.sync db, "#{id}", "#{id}:user", "#{id}:ctime"
+		reply = db.mget.sync db, "#{id}", "#{id}:user", "#{id}:ctime, "#{id}:mtime"
 		{
 			data: if reply[0] then JSON.parse reply[0] else {}
 			user: reply[1]
 			ctime: reply[2]
+			mtime: reply[2]
 			id: id
 		}
 
@@ -109,6 +110,12 @@ class Obj
 
 	owner: () ->
 		db.get.sync db, "#{@id}:user"
+
+	files: (start = 0, end = -1) ->
+		db.zrange.sync db, "#{@id}:files", start, end
+
+	comments: (start = 0, end = -1) ->
+		db.zrange.sync db, "#{@id}:comments", start, end
 
 	@findByAllTags: (tags) ->
 		db.sinter.sync db, _.map tags, (tag) -> "tags:#{sha1(tag)}"
@@ -250,6 +257,34 @@ class Foo extends Obj
 
 	type: @type = 1
 
+class Question extends Obj
+
+	type: @type = 2
+
+	@schema:
+		options: 'options'
+		till: 'till'
+
+	load: () ->
+		#super()
+		@options = db.smembers.sync db, "#{@id}:options"
+		@validTill = db.get.sync db, "#{@id}:validTill"
+
+	answer: (uid, optid) ->
+		validTill = db.get.sync db, "#{@id}:validTill"
+		return if validTill < Date.now()
+		exec [
+			['zadd', "#{@id}:answers", optid, uid]
+		]
+
+class File extends Obj
+
+	type: @type = 7
+
+	@schema:
+		mime: 'mime'
+		path: 'path'
+
 ###
 S () ->
 
@@ -275,7 +310,7 @@ S () ->
 #
 # test
 #
-S () ->
+if false then S () ->
 
 	db.flushall.sync db
 
@@ -295,3 +330,15 @@ S () ->
 	user1.publish obj2, 1
 
 	console.log user1.timeline()
+
+###
+b64 = (str) -> (new Buffer(str)).toString('base64')
+a = ''
+t1 = new Date()
+n = 10000
+for i in [0...n]
+	#a = b64 'сибьтфыивбГРПБОбловаибьтывиабпрЛРПЛрплромывтьаиьти'
+	a = sha1 'сибьтфыивбГРПБОбловаибьтывиабпрЛРПЛрплромывтьаиьти'
+t2 = new Date()
+console.log 'DONE', 1000*n/(t2-t1)
+###
