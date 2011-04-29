@@ -111,6 +111,7 @@ Middleware.vanilla = function vanilla(root, options) {
 		// manage cookie-based secure sessions
 		use(Middleware.session(options.security.session));
 		// fill req.context with current user capability
+		// FIXME: if not here, we must somewhere define req.context
 		use(Middleware.caps(options.security.getCapability));
 	}
 
