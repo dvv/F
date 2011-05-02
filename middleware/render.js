@@ -104,7 +104,7 @@ module.exports = function setup(options) {
 		});
 	};
 	Http.ServerResponse.prototype.render = function(name, vars, callback) {
-		console.log('RENDER', arguments);
+		//console.log('RENDER', arguments);
 		var self = this;
 		self.partial(name, vars, function(errBody, body) {
 			self.partial('layout', _.extend({}, vars, {body: body}), function(err, result) {

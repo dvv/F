@@ -23,41 +23,57 @@
 			};
 			// establish websocket connection #1
 			window.comm = window.comm1 = new Comm();
-			comm.on('context', function(context) {
-				this.expose({name: 'dvv aka Vladimir', lid: '#l1'});
-				this.expose({bar: 'fake', baz: null, foo: function(callback){console.log('FOOO', arguments);typeof callback === 'function' && callback(1,2)}});
-				this.expose(caps);
-			});
+			comm1.contextChanged = function() {
+				//this.expose({name: 'dvv aka Vladimir', lid: '#l1'});
+				//this.expose({bar: 'fake', baz: null, foo: function(callback){console.log('FOOO', arguments);typeof callback === 'function' && callback(1,2)}});
+				console.log('CONTEXT!');
+				this.expose(_.extend({}, caps, {name: 'dvv aka Vladimir', lid: '#l1', groups: {foo: {}}}));
+			};
+			/*setTimeout(function(){
+				comm1.expose(_.extend({}, caps, {name: 'dvv aka Vladimir', lid: '#l1', groups: {foo: {}}}));
+			}, 1000);*/
+if (false) {
 			// establish websocket connection #2
 			window.comm2 = new Comm(/* any other host and options you like! */);
-			comm2.on('context', function(context) {
+			comm2.contextChanged = function() {
 				this.expose({name: 'Vladimir aka dvv', lid: '#l2'});
 				this.expose(caps);
-			});
+			};
 			// establish websocket connection #N
 			window.comm3 = new Comm(/* any other host and options you like! */);
-			comm3.on('context', function(context) {
+			comm3.contextChanged = function() {
 				this.expose(_.extend({}, caps, {name: 'dronnikov@gmail.com', lid: '#l3'}));
-			});
+			};
+}
 			// handle posting
-			$('button').click(function(ev) {
+			$('button.send').click(function(ev) {
 				var input = $(this).previous();
 				var id = input.attr('data-id');
-				var text = input.attr('value');
-				window['comm'+id].context.post(function() {
+				var text = input.val();
+				window['comm'+id].comm.context.post(function() {
 					console.log('POSTED!', arguments);
-					input[0].value = '';
+					input.val('');
+				}, text);
+			});
+			// handle joining
+			$('button.join').click(function(ev) {
+				var input = $(this).previous().previous();
+				var id = input.attr('data-id');
+				var text = input.val();
+				window['comm'+id].comm.context.join(function() {
+					console.log('JOINED!', arguments);
+					input.val('');
 				}, text);
 			});
 		});
 	</script>
 </head>
 <body>
-Your message as dvv: <input data-id="1" type="text"/><button>Send</button><br/>
+Your message as dvv: <input data-id="1" type="text"/><button class="send">Send</button><button class="join">Join</button><br/>
 <ol id="l1"></ol>
-Your message as Vladimir: <input data-id="2" type="text"/><button>Send</button><br/>
+<!--Your message as Vladimir: <input data-id="2" type="text"/><button>Send</button><br/>
 <ol id="l2"></ol>
 Your message as dronnikov@gmail.com: <input data-id="3" type="text"/><button>Send</button><br/>
-<ol id="l3"></ol>
+<ol id="l3"></ol-->
 </body>
 </html>
