@@ -2,6 +2,8 @@
 <head>
 	<meta charset="utf-8">
 	<script type="text/javascript" src="js/ender.js"></script>
+	<script type="text/javascript" src="/socket.io/socket.io.js"></script>
+	<script type="text/javascript" src="js/ws.js"></script>
 	<script type="text/javascript">
 		// shim ender.js
 		window._ = $; _.mixin = $.ender;
@@ -9,12 +11,12 @@
 		if (typeof console == 'undefined') console = {log: alert};
 		window.dump = function() {console.log('DUMP', arguments);};
 		// load scripts
-		$.script([
+		/*$.script([
 			'/socket.io/socket.io.js',
 			'js/ws.js'
-		], function() {
+		], function() {*/
 			// scripts loaded
-			//console.log('APPLOADED');
+			console.log('APPLOADED', _, io);
 			var caps = {
 				ping: function(cb, text) {
 					//console.log('P', this);
@@ -22,16 +24,13 @@
 				}
 			};
 			// establish websocket connection #1
-			window.comm = window.comm1 = new Comm();
-			comm1.contextChanged = function() {
-				//this.expose({name: 'dvv aka Vladimir', lid: '#l1'});
-				//this.expose({bar: 'fake', baz: null, foo: function(callback){console.log('FOOO', arguments);typeof callback === 'function' && callback(1,2)}});
-				console.log('CONTEXT!');
-				this.expose(_.extend({}, caps, {name: 'dvv aka Vladimir', lid: '#l1', groups: {foo: {}}}));
-			};
-			/*setTimeout(function(){
-				comm1.expose(_.extend({}, caps, {name: 'dvv aka Vladimir', lid: '#l1', groups: {foo: {}}}));
-			}, 1000);*/
+			window.comm = window.comm1 = new Comm(null, {
+				bootstrap: function() {
+					console.log('CONTEXT!', this, arguments);
+					//this.publish(dump, _.extend({}, caps, {name: 'dvv aka Vladimir', lid: '#l1', groups: {foo: {}}}));
+					this.update(_.extend({}, caps, {name: 'dvv aka Vladimir', lid: '#l1', groups: {foo: {}}}));
+				}
+			});
 if (false) {
 			// establish websocket connection #2
 			window.comm2 = new Comm(/* any other host and options you like! */);
@@ -45,12 +44,13 @@ if (false) {
 				this.expose(_.extend({}, caps, {name: 'dronnikov@gmail.com', lid: '#l3'}));
 			};
 }
+$.domReady(function(){
 			// handle posting
 			$('button.send').click(function(ev) {
 				var input = $(this).previous();
 				var id = input.attr('data-id');
 				var text = input.val();
-				window['comm'+id].comm.context.post(function() {
+				window['comm'+id].context.post(function() {
 					console.log('POSTED!', arguments);
 					input.val('');
 				}, text);
@@ -60,12 +60,13 @@ if (false) {
 				var input = $(this).previous().previous();
 				var id = input.attr('data-id');
 				var text = input.val();
-				window['comm'+id].comm.context.join(function() {
+				window['comm'+id].context.join(function() {
 					console.log('JOINED!', arguments);
 					input.val('');
 				}, text);
 			});
-		});
+});
+		//});
 	</script>
 </head>
 <body>

@@ -11,7 +11,10 @@ var Ws = require('./ws');
 function getContext(sid) {
 	// `self` will reference the client
 	var self = this;
-	//
+
+	// N.B. in functions:
+	// `this` -- context
+	// `self` -- socket
 	var caps = {
 		user: {
 			id: 'anonymous',
@@ -29,27 +32,32 @@ function getContext(sid) {
 			}
 		},
 		post: function(next, msg) {
-			//console.log('POST');
 			console.log('Post', self.invoke(null, 'ping', this.name + ' ['+_.keys(this.groups).join()+']' + ' says ' + msg), arguments);
 			typeof next === 'function' && next(null, 'ack');
 		},
 		groups: {},
 		join: function(next, group) {
-			// `this` -- context
-			// `self` -- socket
+			console.log('JOIN', this, arguments);
 			this.groups[group] = {};
-			// FIXME: weird effects... don't work...
-			self.expose({groups: this.groups});
-			typeof next === 'function' && next(null, 'ack');
+			typeof next === 'function' && next(null, this.groups);
 		},
 		leave: function(next, group) {
 			_.each(Array.prototype.slice.call(arguments, 1), function(g) {
 				delete this.groups[g];
 			}, this);
-			self.expose({groups: this.groups});
-			typeof next === 'function' && next(null, 'ack');
+			typeof next === 'function' && next(null, this.groups);
+		},
+		update: function(next, changes) {
+			console.log('UPDATE', changes);
+			// FIXME: insecure
+			/*if (this.hasOwnProperty(name) && !this[name].id) {
+				typeof next === 'function' && next('forbidden');
+			} else {
+				typeof next === 'function' && next(null, [name, fn]);
+			}*/
 		}
 	};
+
 	return caps;
 }
 
