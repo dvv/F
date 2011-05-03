@@ -84,7 +84,7 @@ var THIS_IS_FUNC_LEN = THIS_IS_FUNC.length;
 //
 function normalize(options) {
 
-	this.context = this.cbs = {};
+	this.context = this.fns = this.cbs = {};
 
 	//console.log('JOINED');
 
@@ -102,7 +102,7 @@ function normalize(options) {
 	this.on('disconnect', function() {
 		//console.log('LEFT');
 		// flush `this` capability
-		this.context = this.cbs = {};
+		this.context = this.fns = this.cbs = {};
 	});
 
 	//
@@ -123,13 +123,13 @@ function sendExt(msg) {
 		// N.B. reparsed functions no pasaran
 		if (_.isFunction(v) && !v.id) {
 			var fid = nonce();
-			self.on(k + '_' + fid, v);
+			self.fns[fid] = v;
 			v = THIS_IS_FUNC + fid;
 		}
 		return v;
 	}
 	var s = '~j~'+JSON.stringify(msg, replacer);
-	console.log('SENDEXT', s, self._events);
+	console.log('SENDEXT', s);
 	self.send(s);
 }
 
@@ -151,8 +151,7 @@ function registerRemoteFunction(fid) {
 		}
 		// RPC
 		var msg = {cmd: 'call', id: id, method: fid, params: args};
-		//sendExt.call(self, msg);
-		self.send(msg);
+		sendExt.call(self, msg);
 	};
 	// mark function as remote, to inhibit passing to the remote end
 	fn.id = fid;
@@ -296,11 +295,12 @@ if (CLIENT_SIDE) {
 
 		ws.on('connection', function(comm) {
 			// deal with shared context
-			// N.B. this should be the only place which honors passing/receiving functions over the wire
+			// N.B. this should be the only place which honors passing/receiving functions
 			function register(context) {
+				// reset exposed functions
+				comm.fns = {};
 				// augment the context with unforgeable service methods
 				Object.defineProperties(context, {
-					// update the context
 					update: {
 						value: function(next, changes) {
 							// reparse to honor functions
@@ -315,14 +315,13 @@ if (CLIENT_SIDE) {
 				// set the context
 				comm.context = context;
 				// fire 'ready' callback
-				respondExt.call(comm, 'ready', null, context);
+				respondExt.call(comm, 'ready', null, comm.context);
 			}
 			//
 			normalize.call(comm, {});
 			// session id
 			// N.B. to authorize the client we reuse 'sid' cookie from the HTTP request
 			// N.B. this allows for any kind of external authentication
-			// FIXME: xhr-polling doesn't provide request...
 			console.log('COMM', comm, comm.request);
 			var sid = comm.request.headers.cookie && comm.request.headers.cookie.match(new RegExp('(?:^|;) *' + 'sid' + '=([^;]*)')); sid = sid && sid[1] || '';
 			// register the context
@@ -344,6 +343,9 @@ if (CLIENT_SIDE) {
 			} else {
 				register(getContext);
 			}
+			// FIXME: this is too much, in fact
+			// FIXME: kinda safer broadcaster is needed
+			comm.invoke = this.invoke;
 		});
 
 		// FIXME: do we need this?
@@ -354,6 +356,13 @@ if (CLIENT_SIDE) {
 				}
 			}
 		});
+
+		// simplest client filter: by context.group
+		ws.group = function(name) {
+			return _.filter(this.clients, function(client, cid) {
+				return client.context.group === name;
+			});
+		};
 
 		// remote function invocation helper
 		// invoke(filterFunc, path-to-method, arg1, arg2, ...)

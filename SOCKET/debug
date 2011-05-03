@@ -1,0 +1,4 @@
+#!/bin/sh
+killall node
+node-inspector &
+exec node-fibers --debug server.js

@@ -52,21 +52,16 @@ function drill(obj, path) {
 }
 
 //
-// invoke deep method of `this` identified by `path` with optional parameters
-//
-function caller(path) {
-	var fn = drill(this, path);
-	_.isFunction(fn) && fn.apply(null, Array.prototype.slice.call(arguments, 1));
-}
-
-//
-// invoke `caller` for each element of `list` filtered with `filter`
+// invoke deep method identified by `path` for each element of `list` filtered with `filter`
 //
 function invoke(list, filter, path) {
-	var args = Array.prototype.slice.call(arguments, 2);
-	if (_.isFunction(filter)) list = _.filter(list, filter);
+	var args = Array.prototype.slice.call(arguments, 3);
+	if (filter && filter.call) list = _.filter(list, filter);
 	_.each(list, function(item) {
-		caller.apply(item, args);
+		if (item && item.context) {
+			var fn = drill(item.context, path);
+			if (fn && fn.apply) fn.apply(null, args);
+		}
 	});
 }
 
@@ -84,7 +79,7 @@ var THIS_IS_FUNC_LEN = THIS_IS_FUNC.length;
 //
 function normalize(options) {
 
-	this.context = this.cbs = {};
+	this.context = this.fns = this.cbs = {};
 
 	//console.log('JOINED');
 
@@ -102,7 +97,7 @@ function normalize(options) {
 	this.on('disconnect', function() {
 		//console.log('LEFT');
 		// flush `this` capability
-		this.context = this.cbs = {};
+		this.context = this.fns = this.cbs = {};
 	});
 
 	//
@@ -110,7 +105,21 @@ function normalize(options) {
 	//
 	this.on('message', _.bind(handler, this));
 
+	//
+	// `this` context is set
+	//
+	this.on('context', function() {
+		//console.log('CONTEXT', this.context);
+	});
+
 	return this;
+}
+
+//
+// empty function
+//
+function nop() {
+	console.log('CONTINUE', arguments);
 }
 
 //
@@ -119,18 +128,46 @@ function normalize(options) {
 //
 function sendExt(msg) {
 	var self = this;
+
+	/*
+	var p = [];
+	var o = [];
+
+	function replacer(k, v) {
+		var i = o.indexOf(this);
+		if (k) {
+			if (i < 0) {
+				//console.log('PUSHING 1', k, v);
+				o.push(v);
+				p.push(k);
+			} else {
+				k = p[i] + '.' + k;
+				i = o.indexOf(v);
+				if (i < 0) {
+					//console.log('PUSHING 2', k, v);
+					o.push(v);
+					p.push(k);
+				}
+			}
+		}
+		if (typeof v === 'function' && !v.id) {
+			var fid = k.substring(7); // strip 'result.'
+			self.fns[fid] = v;
+			v = THIS_IS_FUNC + fid;
+			//console.log('REPL!', k, p, o);
+		}
+		return v;
+	}*/
 	function replacer(k, v) {
 		// N.B. reparsed functions no pasaran
 		if (_.isFunction(v) && !v.id) {
 			var fid = nonce();
-			self.on(k + '_' + fid, v);
+			self.fns[fid] = v;
 			v = THIS_IS_FUNC + fid;
 		}
 		return v;
 	}
-	var s = '~j~'+JSON.stringify(msg, replacer);
-	console.log('SENDEXT', s, self._events);
-	self.send(s);
+	self.send('~j~'+JSON.stringify(msg, replacer));
 }
 
 //
@@ -151,8 +188,7 @@ function registerRemoteFunction(fid) {
 		}
 		// RPC
 		var msg = {cmd: 'call', id: id, method: fid, params: args};
-		//sendExt.call(self, msg);
-		self.send(msg);
+		sendExt.call(self, msg);
 	};
 	// mark function as remote, to inhibit passing to the remote end
 	fn.id = fid;
@@ -173,7 +209,6 @@ function reparse(msg) {
 			var fid = v.substring(THIS_IS_FUNC_LEN);
 			// register the wrapper function
 			v = registerRemoteFunction.call(self, fid);
-			v.key = k;
 		}
 		return v;
 	});
@@ -212,7 +247,7 @@ function handler(message) {
 	var self = this;
 	// sanity checks
 	if (!message) return;
-	console.log('MESSAGE', message.cmd, 'ID', message.id, 'METH', message.method, 'DATA', message.data, message, self.context, self.fns);
+	console.log('MESSAGE', message.cmd, 'ID', message.id, 'METH', message.method, 'DATA', message.data, message, self.context);
 	var fn;
 	// remote side calls this side wrapper function
 	if (message.cmd === 'call' && typeof message.method === 'string' && (fn = self.fns[message.method])) {
@@ -265,20 +300,14 @@ if (CLIENT_SIDE) {
 			// reparse to honor functions
 			context = reparse.call(comm, context);
 			// setup context
-			//self.context = comm.context = context;
-			_.extend(self, comm.context = context);
+			self.context = comm.context = context;
 			//// fire 'ready' callback
-			_.isFunction(options.ready) && options.ready.call(self);
+			_.isFunction(options.ready) && options.ready.call(self.context);
 			// fire 'context' event
 			//self.emit('context');
 		};
 		// make connection
 		comm.connect();
-	}
-	Comm.prototype.update = function() {
-		var args = Array.prototype.slice.call(arguments);
-		args.unshift(this);
-		_.extend.apply(null, args);
 	}
 
 } else {
@@ -296,11 +325,12 @@ if (CLIENT_SIDE) {
 
 		ws.on('connection', function(comm) {
 			// deal with shared context
-			// N.B. this should be the only place which honors passing/receiving functions over the wire
+			// N.B. this should be the only place which honors passing/receiving functions
 			function register(context) {
+				// reset exposed functions
+				comm.fns = {};
 				// augment the context with unforgeable service methods
 				Object.defineProperties(context, {
-					// update the context
 					update: {
 						value: function(next, changes) {
 							// reparse to honor functions
@@ -315,21 +345,19 @@ if (CLIENT_SIDE) {
 				// set the context
 				comm.context = context;
 				// fire 'ready' callback
-				respondExt.call(comm, 'ready', null, context);
+				respondExt.call(comm, 'ready', null, comm.context);
 			}
 			//
 			normalize.call(comm, {});
 			// session id
 			// N.B. to authorize the client we reuse 'sid' cookie from the HTTP request
 			// N.B. this allows for any kind of external authentication
-			// FIXME: xhr-polling doesn't provide request...
-			console.log('COMM', comm, comm.request);
 			var sid = comm.request.headers.cookie && comm.request.headers.cookie.match(new RegExp('(?:^|;) *' + 'sid' + '=([^;]*)')); sid = sid && sid[1] || '';
 			// register the context
 			// N.B. getContext can rely on DB to fetch the context!
 			// getter is a function?
 			if (_.isFunction(getContext)) {
-				// getter's arity is > 1? --> assume it's async
+				// if getter's arity is >1, assume it's async
 				if (getContext.length > 1) {
 					getContext.call(comm, sid, function(err, result) {
 						// set this side context and send it to remote side
@@ -344,6 +372,9 @@ if (CLIENT_SIDE) {
 			} else {
 				register(getContext);
 			}
+			// FIXME: this is too much, in fact
+			// FIXME: kinda safer broadcaster is needed
+			comm.invoke = this.invoke;
 		});
 
 		// FIXME: do we need this?
@@ -354,6 +385,13 @@ if (CLIENT_SIDE) {
 				}
 			}
 		});
+
+		// simplest client filter: by context.group
+		ws.group = function(name) {
+			return _.filter(this.clients, function(client, cid) {
+				return client.context.group === name;
+			});
+		};
 
 		// remote function invocation helper
 		// invoke(filterFunc, path-to-method, arg1, arg2, ...)
