@@ -15,8 +15,13 @@
   }
 
   function boosh(s, r) {
-    var els = typeof s !== 'string' && !s.nodeType && isFinite(s.length) ? s : ender._select(s, r);
-    els.selector = s;
+    var els;
+    if (ender._select && typeof s == 'string' || s.nodeName || s.length && 'item' in s) { //string || node || nodelist
+      els = ender._select(s, r);
+      els.selector = s;
+    } else {
+      els = isFinite(s.length) ? s : [s];
+    }
     return aug(els, boosh);
   }
 
@@ -25,12 +30,9 @@
   }
 
   aug(ender, {
-    _VERSION: '0.1.6',
+    _VERSION: '0.1.8',
     ender: function (o, chain) {
       aug(chain ? boosh : ender, o);
-    },
-    _select: function () {
-      return [];
     }
   });
 
@@ -1429,7 +1431,7 @@
       byTag = 'getElementsByTagName',
       specialAttributes = /^checked|value|selected$/,
       stateAttributes = /^checked|selected$/,
-      ie = /msie/.test(navigator.userAgent),
+      ie = /msie/i.test(navigator.userAgent),
       uidList = [],
       uuids = 0,
       digit = /^-?\d+$/,
@@ -1437,7 +1439,8 @@
       // commonly used methods
       setAttribute = 'setAttribute',
       getAttribute = 'getAttribute',
-      trimReplace = /(^\s*|\s*$)/g;
+      trimReplace = /(^\s*|\s*$)/g,
+      unitless = { lineHeight: 1, zoom: 1, zIndex: 1, opacity: 1 };
 
   function classReg(c) {
     return new RegExp("(^|\\s+)" + c + "(\\s+|$)");
@@ -1518,7 +1521,8 @@
       each(self, function (el) {
         var n = el.cloneNode(true);
         fn(t, n);
-        r[i] = n; i++;
+        r[i] = n;
+        i++;
       });
     }, this);
     each(r, function (e, i) {
@@ -1749,7 +1753,7 @@
           if (iter.hasOwnProperty(k)) {
             v = iter[k];
             // change "5" to "5px" - unless you're line-height, which is allowed
-            (p = camelize(k)) && digit.test(v) && p != 'lineHeight' && (v += px);
+            (p = camelize(k)) && digit.test(v) && !(p in unitless) && (v += px);
             el.style[p] = v;
           }
         }

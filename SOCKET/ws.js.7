@@ -217,11 +217,10 @@ function handler(message) {
 	console.log('MESSAGE', message.cmd, 'ID', message.id, 'METH', message.method, 'DATA', message.data, message);
 	var fn;
 	// remote side calls this side wrapper function
-	//if (message.cmd === 'call' && typeof message.method === 'string' && (fn = self.fns[message.method])) {
-	if (message.cmd === 'call' && typeof message.method === 'string' && (fn = drill(self.context, message.method))) {
+	if (message.cmd === 'call' && typeof message.method === 'string' && (fn = self.fns[message.method])) {
 		// the signature is fixed: function(callback[, arg1[, arg2[, ...]]])
 		// N.B. we will reply to caller only if message.id is given
-		var args = [_.bind(respondExt, self, message.id)];
+		var args = [_.bind(respond, self, message.id)];
 		// optional arguments come from message.params
 		if (message.params) Array.prototype.push.apply(args, message.params);
 		fn.apply(self.context, args);
@@ -262,20 +261,8 @@ if (CLIENT_SIDE) {
 		// create socket
 		var comm = new io.Socket(host, options);
 		normalize.call(comm, {});
-		// N.B. we assign to comm.context, do not overwite, only mangle!
+		// N.B. we assign to comm.context, do not overwite, only mangle
 		comm.context = self;
-
-		// FIXME: won't be needed in production
-		//
-		Object.defineProperties(self, {
-			comm: {
-				get: function() {
-					return comm;
-				}
-			}
-		});
-		//
-
 		// register 'context' callback
 		comm.cbs.context = function(error, context) {
 			// reparse to honor functions
@@ -288,15 +275,21 @@ if (CLIENT_SIDE) {
 			//// fire 'context' event
 			//$(self).emit('context');
 		};
-
+		Object.defineProperties(self, {
+			comm: {
+				get: function() {
+					return comm;
+				}
+			}
+		});
 		// make connection
 		comm.connect();
 	};
 	Comm.prototype.take = function(sid) {
 		// N.B. to authorize the client we reuse 'sid' cookie from the HTTP request
 		// N.B. this allows for any kind of external authentication
-		//var sid = document.cookie.match(new RegExp('(?:^|;) *' + 'sid' + '=([^;]*)')); sid = sid && sid[1] || '';
-		var sid = '123';
+		var sid = document.cookie.match(new RegExp('(?:^|;) *' + 'sid' + '=([^;]*)')); sid = sid && sid[1] || '';
+		sid = '123';
 		this.login(function() {
 			console.log('LOGGED', this, arguments);
 		}, sid);
@@ -344,11 +337,8 @@ if (CLIENT_SIDE) {
 					},
 					login: {
 						value: function(next, sid) {
-							//take(sid);
-							//_.isFunction(next) && next();
-							// FIXME: other cases: async, e.g.!!!
-							var ctx = getContext.call(comm, sid);
-							_.isFunction(next) && next(null, ctx);
+							take(sid);
+							_.isFunction(next) && next();
 						},
 						enumerable: true
 					}

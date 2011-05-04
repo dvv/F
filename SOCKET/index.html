@@ -4,6 +4,7 @@
 	<script type="text/javascript" src="js/ender.js"></script>
 	<script type="text/javascript" src="/socket.io/socket.io.js"></script>
 	<script type="text/javascript" src="js/ws.js"></script>
+	<script type="text/javascript" src="comm.js"></script>
 	<script type="text/javascript">
 		// shim ender.js
 		window._ = $; _.mixin = $.ender;
@@ -16,7 +17,7 @@
 			'js/ws.js'
 		], function() {*/
 			// scripts loaded
-			console.log('APPLOADED', _, io);
+			console.log('APPLOADED');//, _, io);
 			var caps = {
 				ping: function(cb, text) {
 					console.log('P', this);
@@ -25,29 +26,26 @@
 			};
 			// establish websocket connection #1
 			window.comm = window.comm1 = new Comm(null, {
-				ready: function() {
+				context: function() {
 					console.log('CONTEXT!', this, arguments);
-					_.extend(this, caps, {name: 'dvv aka Vladimir', lid: '#l1'});
-					this.update(this);
+					this.set(_.extend({}, caps, {name: 'dvv aka Vladimir', lid: '#l1'}));
 				}
 			});
 if (false) {
 			// establish websocket connection #2
 			window.comm2 = new Comm(null, {
 				/* any other host and options you like! */
-				ready: function() {
+				context: function() {
 					console.log('CONTEXT!', this, arguments);
-					_.extend(this, caps, {name: 'Vladimir aka dvv', lid: '#l2'});
-					this.update(this);
+					this.set(_.extend({}, caps, {name: 'Vladimir aka dvv', lid: '#l2'}));
 				}
 			});
 			// establish websocket connection #N
 			window.comm3 = new Comm(null, {
 				/* any other host and options you like! */
-				ready: function() {
+				context: function() {
 					console.log('CONTEXT!', this, arguments);
-					_.extend(this, caps, {name: 'dronnikov@gmail.com', lid: '#l3'});
-					this.update(this);
+					this.set(_.extend({}, caps, {name: 'dronnikov@gmail.com', lid: '#l3'}));
 				}
 			});
 }
@@ -67,8 +65,9 @@ $.domReady(function(){
 				var input = $(this).previous().previous();
 				var id = input.attr('data-id');
 				var text = input.val();
-				window['comm'+id].join(function() {
-					console.log('JOINED!', arguments);
+				window['comm'+id].join(function(err, groups) {
+					console.log('JOINED!', arguments, this);
+					this.groups = groups;
 					input.val('');
 				}, text);
 			});
@@ -77,8 +76,9 @@ $.domReady(function(){
 				var input = $(this).previous().previous().previous();
 				var id = input.attr('data-id');
 				var text = input.val();
-				window['comm'+id].leave(function() {
+				window['comm'+id].leave(function(err, groups) {
 					console.log('LEFT!', arguments);
+					this.groups = groups;
 					input.val('');
 				}, text);
 			});

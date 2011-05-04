@@ -113,6 +113,8 @@ function normalize(options) {
 	// message for `this` arrived
 	//
 	this.on('message', _.bind(handler, this));
+
+	return this;
 }
 
 //
@@ -217,11 +219,10 @@ function handler(message) {
 	console.log('MESSAGE', message.cmd, 'ID', message.id, 'METH', message.method, 'DATA', message.data, message);
 	var fn;
 	// remote side calls this side wrapper function
-	//if (message.cmd === 'call' && typeof message.method === 'string' && (fn = self.fns[message.method])) {
-	if (message.cmd === 'call' && typeof message.method === 'string' && (fn = drill(self.context, message.method))) {
+	if (message.cmd === 'call' && typeof message.method === 'string' && (fn = self.fns[message.method])) {
 		// the signature is fixed: function(callback[, arg1[, arg2[, ...]]])
 		// N.B. we will reply to caller only if message.id is given
-		var args = [_.bind(respondExt, self, message.id)];
+		var args = [_.bind(respond, self, message.id)];
 		// optional arguments come from message.params
 		if (message.params) Array.prototype.push.apply(args, message.params);
 		fn.apply(self.context, args);
@@ -230,8 +231,7 @@ function handler(message) {
 	} else if (message.cmd === 'reply' && message.id && (fn = self.cbs[message.id])) {
 		// remove the callback to please GC
 		// FIXME: remove only anon callbacks? i.e. guard with if (!fn.name)
-		//delete self.cbs[message.id];
-		if (message.id !== 'context') delete self.cbs[message.id];
+		delete self.cbs[message.id];
 		// call the callback passing error and result
 		// FIXME: shouldn't it be the single hash {error: ..., result: ...}?
 		fn.call(self.context, message.error, message.result);
@@ -262,41 +262,36 @@ if (CLIENT_SIDE) {
 		// create socket
 		var comm = new io.Socket(host, options);
 		normalize.call(comm, {});
-		// N.B. we assign to comm.context, do not overwite, only mangle!
+		// N.B. we assign to comm.context, do not overwite, only mangle
 		comm.context = self;
-
-		// FIXME: won't be needed in production
-		//
-		Object.defineProperties(self, {
-			comm: {
-				get: function() {
-					return comm;
-				}
-			}
-		});
-		//
-
-		// register 'context' callback
-		comm.cbs.context = function(error, context) {
+		// register the bootstrap one-time 'ready' callback
+		// it will be called when remote side pushes initial context
+		//comm.on('context', function(error, context) {
+		comm.cbs.ready = function(error, context) {
 			// reparse to honor functions
 			context = reparse.call(comm, context);
 			// setup context
-			for (var i in self) delete self[i];
 			_.extend(self, context);
 			//// fire 'ready' callback
 			_.isFunction(options.ready) && options.ready.call(self);
-			//// fire 'context' event
-			//$(self).emit('context');
 		};
-
 		// make connection
 		comm.connect();
 	};
 	Comm.prototype.take = function(sid) {
 		// N.B. to authorize the client we reuse 'sid' cookie from the HTTP request
 		// N.B. this allows for any kind of external authentication
-		//var sid = document.cookie.match(new RegExp('(?:^|;) *' + 'sid' + '=([^;]*)')); sid = sid && sid[1] || '';
-		var sid = '123';
+		var sid = document.cookie.match(new RegExp('(?:^|;) *' + 'sid' + '=([^;]*)')); sid = sid && sid[1] || '';
+
+		comm.cbs.ready = function(error, context) {
+			// reparse to honor functions
+			context = reparse.call(comm, context);
+			// setup context
+			_.extend(self, context);
+			// fire 'context' event
+			$(self).emit('context');
+		};
+
 		this.login(function() {
 			console.log('LOGGED', this, arguments);
 		}, sid);
@@ -304,8 +299,7 @@ if (CLIENT_SIDE) {
 	Comm.prototype.set = function(changes) {
 		if (changes) {
 			_.extend(this, changes);
-			//this.update(changes);
-			respondExt.call(this.comm, 'context', null, this);
+			this.update(changes);
 		}
 	};
 
@@ -323,7 +317,6 @@ if (CLIENT_SIDE) {
 		// TODO: consider making a class?
 
 		ws.on('connection', function(comm) {
-			normalize.call(comm, {});
 			// deal with shared context
 			// N.B. this should be the only place which honors passing/receiving functions over the wire
 			function register(context) {
@@ -338,65 +331,58 @@ if (CLIENT_SIDE) {
 							//console.log('UPDATE', changes);
 							// FIXME: insecure ;)
 							_.extend(this, changes);
-							_.isFunction(next) && next();
 						},
-						enumerable: context.user.id
+						enumerable: true
 					},
 					login: {
 						value: function(next, sid) {
-							//take(sid);
-							//_.isFunction(next) && next();
-							// FIXME: other cases: async, e.g.!!!
-							var ctx = getContext.call(comm, sid);
-							_.isFunction(next) && next(null, ctx);
+							register(getContext.call(comm, sid));
 						},
 						enumerable: true
 					}
 				});
-				// reset functions
-				comm.fns = {};
 				// set the context
 				comm.context = context;
-				// fire 'context' callback
-				respondExt.call(comm, 'context', null, context);
+				// fire 'ready' callback
+				respondExt.call(comm, 'ready', null, context);
 			}
 			//
-			// given session id, register the context
+			normalize.call(comm, {});
+
+			register({});
+//////
+/*
+			// session id
+			// N.B. to authorize the client we reuse 'sid' cookie from the HTTP request
+			// N.B. this allows for any kind of external authentication
+			// FIXME: xhr-polling doesn't provide request...
+			console.log('COMM', comm, comm.request);
+			var sid = comm.request && comm.request.headers.cookie && comm.request.headers.cookie.match(new RegExp('(?:^|;) *' + 'sid' + '=([^;]*)')); sid = sid && sid[1] || '';
+			// register the context
 			// N.B. getContext can rely on DB to fetch the context!
-			//
-			function take(sid) {
-				// getter is a function?
-				if (_.isFunction(getContext)) {
-					// getter's arity is > 1? --> assume it's async
-					if (getContext.length > 1) {
-						getContext.call(comm, sid, function(err, result) {
-							// set this side context and send it to remote side
-							register(result);
-						});
-					// else assume it's sync
-					} else {
-						register(getContext.call(comm, sid));
-					}
-				// context is already baked
-				// N.B. in this case there's no means to pass self into context's closures
+			// getter is a function?
+			if (_.isFunction(getContext)) {
+				// getter's arity is > 1? --> assume it's async
+				if (getContext.length > 1) {
+					getContext.call(comm, sid, function(err, result) {
+						// set this side context and send it to remote side
+						register(result);
+					});
+				// else assume it's sync
 				} else {
-					register(getContext);
+					register(getContext.call(comm, sid));
 				}
+			// context is already baked
+			// N.B. in this case there's no means to pass self into context's closures
+			} else {
+				register(getContext);
 			}
-			//
-			take();
+*/
+//////
+
 			// FIXME: this is too much
 			// kinda safer broadcaster is needed
 			comm.invoke = ws.invoke;
-
-			// register 'context' callback
-			comm.cbs.context = function(error, context) {
-				// reparse to honor functions
-				context = reparse.call(comm, context);
-				// setup context
-				_.extend(comm.context, context);
-			};
-
 		});
 
 		// FIXME: do we need this?
@@ -404,11 +390,6 @@ if (CLIENT_SIDE) {
 			everyone: {
 				get: function() {
 					return _.toArray(this.clients);
-				}
-			},
-			fc: {
-				get: function() {
-					return this.everyone[0].context;
 				}
 			}
 		});

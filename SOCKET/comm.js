@@ -34,6 +34,8 @@ function has(obj, prop) {
 	return Object.prototype.hasOwnProperty.call(obj, prop);
 }
 
+var slice = Array.prototype.slice;
+
 //
 // safely get a deep property of `obj` descending using elements in `path`
 //
@@ -56,14 +58,14 @@ function drill(obj, path) {
 //
 function caller(path) {
 	var fn = drill(this, path);
-	_.isFunction(fn) && fn.apply(null, Array.prototype.slice.call(arguments, 1));
+	_.isFunction(fn) && fn.apply(null, slice.call(arguments, 1));
 }
 
 //
 // invoke `caller` for each element of `list` filtered with `filter`
 //
 function invoke(list, filter, path) {
-	var args = Array.prototype.slice.call(arguments, 2);
+	var args = slice.call(arguments, 2);
 	if (_.isFunction(filter)) list = _.filter(list, filter);
 	_.each(list, function(item) {
 		caller.apply(item.context, args);
@@ -217,11 +219,10 @@ function handler(message) {
 	console.log('MESSAGE', message.cmd, 'ID', message.id, 'METH', message.method, 'DATA', message.data, message);
 	var fn;
 	// remote side calls this side wrapper function
-	//if (message.cmd === 'call' && typeof message.method === 'string' && (fn = self.fns[message.method])) {
-	if (message.cmd === 'call' && typeof message.method === 'string' && (fn = drill(self.context, message.method))) {
+	if (message.cmd === 'call' && typeof message.method === 'string' && (fn = self.fns[message.method])) {
 		// the signature is fixed: function(callback[, arg1[, arg2[, ...]]])
 		// N.B. we will reply to caller only if message.id is given
-		var args = [_.bind(respondExt, self, message.id)];
+		var args = [_.bind(respond, self, message.id)];
 		// optional arguments come from message.params
 		if (message.params) Array.prototype.push.apply(args, message.params);
 		fn.apply(self.context, args);
@@ -261,18 +262,17 @@ if (CLIENT_SIDE) {
 		});
 		// create socket
 		var comm = new io.Socket(host, options);
-		normalize.call(comm, {});
 		// N.B. we assign to comm.context, do not overwite, only mangle!
 		comm.context = self;
+
+		comm.cbs = {};
 
 		// FIXME: won't be needed in production
 		//
 		Object.defineProperties(self, {
-			comm: {
-				get: function() {
-					return comm;
-				}
-			}
+			//comm: {value: comm},
+			comm: {get: function(){return comm;}},
+			cbs: {value: comm.cbs}
 		});
 		//
 
@@ -289,6 +289,8 @@ if (CLIENT_SIDE) {
 			//$(self).emit('context');
 		};
 
+		comm.on('message', this.constructor.prototype.message);
+
 		// make connection
 		comm.connect();
 	};
@@ -297,8 +299,13 @@ if (CLIENT_SIDE) {
 		// N.B. this allows for any kind of external authentication
 		//var sid = document.cookie.match(new RegExp('(?:^|;) *' + 'sid' + '=([^;]*)')); sid = sid && sid[1] || '';
 		var sid = '123';
-		this.login(function() {
+		var self = this;
+		this.rpc('login', function(err, context) {
 			console.log('LOGGED', this, arguments);
+			if (!err) {
+				for (var i in self) delete self[i];
+				_.extend(self, context);
+			}
 		}, sid);
 	};
 	Comm.prototype.set = function(changes) {
@@ -308,6 +315,61 @@ if (CLIENT_SIDE) {
 			respondExt.call(this.comm, 'context', null, this);
 		}
 	};
+	Comm.prototype.rpc = function(path, callback /*, args */) {
+		console.log('CALL', arguments);
+		var args = slice.call(arguments, 1);
+		// register callback
+		if (_.isFunction(callback)) {
+			// consume one argument
+			args.shift();
+			// N.B. callbacks are deleted once they are fired. unless a callback is fired, it holds the memory.
+			// we should introduce expiration for callbacks
+			var id = nonce();
+			this.cbs[id] = callback;
+		}
+		sendExt.call(this.comm, {
+			cmd: 'call',
+			id: id,
+			method: path,
+			params: args
+		});
+	};
+	Comm.prototype.reply = function(id /*, args */) {
+		console.log('REPLY', arguments);
+		var args = slice.call(arguments, 1);
+		if (!id) return;
+		sendExt.call(this.comm, {
+			cmd: 'reply',
+			id: id,
+			params: args
+		});
+	};
+	Comm.prototype.message = function(message) {
+		if (!message) return;
+		console.log('MESSAGE', arguments, this);
+		var fn;
+		// remote side calls this side method
+		if (message.cmd === 'call' && typeof message.method === 'string' && (fn = drill(this.context, message.method))) {
+			// the signature is fixed: function(callback[, arg1[, arg2[, ...]]])
+			// N.B. we will reply to caller only if message.id is given
+			var args = [_.bind(this.reply, this, message.id)];
+			// optional arguments come from message.params
+			if (message.params) Array.prototype.push.apply(args, message.params);
+			fn.apply(this.context, args);
+		// uniquely identified reply from the remote side arrived
+		// given id, lookup callback corresponding to the reply
+		} else if (message.cmd === 'reply' && message.id && (fn = this.cbs[message.id])) {
+			// remove the callback to please GC
+			// FIXME: remove only anon callbacks? i.e. guard with if (!fn.name)
+			//delete self.cbs[message.id];
+			if (message.id !== 'context') delete this.cbs[message.id];
+			message = reparse.call(this, message);
+			// call the callback passing error and result
+			// FIXME: shouldn't it be the single hash {error: ..., result: ...}?
+			fn.call(this.context, message.error, message.result);
+		}
+	};
+
 
 } else {
 
