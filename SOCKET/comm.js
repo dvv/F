@@ -133,7 +133,7 @@ function honorFunctions() {
 	// replace functions with THIS_IS_FUNC signatures
 	// and assign unique ids to functions in `msg`
 	//
-	this.sendWithFunctions = function(msg /* N.B. overridden to support functions */) {
+	this.sendWithFunctions = function(msg) {
 		var self = this;
 		function replacer(k, v) {
 			// N.B. reparsed functions (having ids) no pasaran
@@ -153,9 +153,28 @@ function honorFunctions() {
 	//
 	// revive functions from THIS_IS_FUNC signatures
 	//
+	this.parseWithFunctions = function(msg) {
+		var self = this;
+		var result = JSON.parse(JSON.stringify(msg), function(k, v) {
+			// register each function in the context
+			// FIXME: shouldn't it be done in lazy way via getters?
+			// FIXME: how portable is it in browsers then?
+			if (v && typeof v === 'string' && v.substring(0, THIS_IS_FUNC_LEN) === THIS_IS_FUNC) {
+				// extract function id
+				var fid = v.substring(THIS_IS_FUNC_LEN);
+				// register the wrapper function
+				v = registerRemoteFunction.call(self, fid);
+			}
+			return v;
+		});
+		//console.log('REPARSED', msg, result);
+		return result;
+	};
+
+/*if (false) {
 	var __onMessage = CLIENT_SIDE ? this.transport.constructor.prototype._onMessage : this._onMessage;
 	var self = this;
-	function revive(msg /* N.B. overridden to support functions */) {
+	var revive = function revive(msg) {
 		if (msg.substring(0, 3) === '~j~') {
 			console.log('RECEIVED', msg);
 			this.base._onMessage(JSON.parse(msg.substring(3), function(k, v) {
@@ -180,6 +199,7 @@ function honorFunctions() {
 	} else {
 		this.parser._events.data = _.bind(revive, this);
 	}
+}*/
 
 }
 
@@ -205,6 +225,7 @@ function handler(message) {
 		//delete this.cbs[message.id];
 		if (message.id !== 'context') delete this.cbs[message.id];
 		// callback
+		message.params = this.parseWithFunctions(message.params);
 		fn.apply(this.context, message.params);
 	}
 }
