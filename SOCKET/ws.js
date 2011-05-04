@@ -126,8 +126,10 @@ function sendExt(msg) {
 		if (_.isFunction(v) && !v.id) {
 			// FIXME: should not prepend with `k` in production
 			var fid = k + '_' + nonce();
+			//var fid = nonce();
 			self.fns[fid] = v;
 			v = THIS_IS_FUNC + fid;
+			//v = {__call: fid};
 		}
 		return v;
 	}
@@ -185,25 +187,23 @@ function reparse(msg) {
 //
 // send uniquely identified reply to the remote end
 //
-function respond(id, error, result) {
+function respond(id) {
 	console.log('RESPONDED', arguments);
 	if (!id) return;
 	this.send({
 		cmd: 'reply',
 		id: id,
-		error: error || null,
-		result: result
+		params: Array.prototype.slice.call(arguments, 1)
 	});
 }
 
-function respondExt(id, error, result) {
+function respondExt(id) {
 	console.log('RESPONDEDEXT', arguments);
 	if (!id) return;
 	sendExt.call(this, {
 		cmd: 'reply',
 		id: id,
-		error: error || null,
-		result: result
+		params: Array.prototype.slice.call(arguments, 1)
 	});
 }
 
@@ -217,8 +217,8 @@ function handler(message) {
 	console.log('MESSAGE', message.cmd, 'ID', message.id, 'METH', message.method, 'DATA', message.data, message);
 	var fn;
 	// remote side calls this side wrapper function
-	//if (message.cmd === 'call' && typeof message.method === 'string' && (fn = self.fns[message.method])) {
-	if (message.cmd === 'call' && typeof message.method === 'string' && (fn = drill(self.context, message.method))) {
+	//if (message.cmd === 'call' && typeof message.method === 'string' && (fn = drill(self.context, message.method))) {
+	if (message.cmd === 'call' && typeof message.method === 'string' && (fn = self.fns[message.method])) {
 		// the signature is fixed: function(callback[, arg1[, arg2[, ...]]])
 		// N.B. we will reply to caller only if message.id is given
 		var args = [_.bind(respondExt, self, message.id)];
@@ -232,9 +232,7 @@ function handler(message) {
 		// FIXME: remove only anon callbacks? i.e. guard with if (!fn.name)
 		//delete self.cbs[message.id];
 		if (message.id !== 'context') delete self.cbs[message.id];
-		// call the callback passing error and result
-		// FIXME: shouldn't it be the single hash {error: ..., result: ...}?
-		fn.call(self.context, message.error, message.result);
+		fn.apply(self.context, message.params);
 	}
 }
 
@@ -330,25 +328,10 @@ if (CLIENT_SIDE) {
 				//console.log('REGISTER', context);
 				// augment the context with unforgeable service methods
 				Object.defineProperties(context, {
-					// update the context
-					update: {
-						value: function(next, changes) {
-							// reparse to honor functions
-							changes = reparse.call(comm, changes);
-							//console.log('UPDATE', changes);
-							// FIXME: insecure ;)
-							_.extend(this, changes);
-							_.isFunction(next) && next();
-						},
-						enumerable: context.user.id
-					},
 					login: {
 						value: function(next, sid) {
-							//take(sid);
-							//_.isFunction(next) && next();
-							// FIXME: other cases: async, e.g.!!!
-							var ctx = getContext.call(comm, sid);
-							_.isFunction(next) && next(null, ctx);
+							take(sid);
+							_.isFunction(next) && next();
 						},
 						enumerable: true
 					}
