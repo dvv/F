@@ -26,7 +26,6 @@
 			window.comm = window.comm1 = new Comm(null, {
 				ready: function(reset) {
 					console.log('READY!', this, reset);
-					if (!reset) return;
 					if (!this.user.id) return this.signin('123');
 					this.extend(_.extend({}, caps, {name: 'dvv aka Vladimir', lid: '#l1'}));
 				}

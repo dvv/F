@@ -28,9 +28,11 @@ var push = Array.prototype.push;
 //
 // simple nonce generator
 //
+function rnd() {
+	return Math.floor(Math.random() * 1e9).toString(36);
+}
 function nonce() {
-	//return Math.random().toString().substring(2);
-	return (Date.now() & 0x7fff).toString(36) + Math.floor(Math.random() * 1e9).toString(36) + Math.floor(Math.random() * 1e9).toString(36) + Math.floor(Math.random() * 1e9).toString(36);
+	return (Date.now() & 0x7fff).toString(36) + rnd() + rnd() + rnd();
 }
 
 //
@@ -38,6 +40,23 @@ function nonce() {
 //
 function has(obj, prop) {
 	return Object.prototype.hasOwnProperty.call(obj, prop);
+}
+
+//
+// shallow extend the `dst` with properties of `src`
+// if a property of `src` is set to null then remove corresponding `dst` property
+// TODO: more elaborate version, may be even deep merge?
+//
+function extend(dst, src) {
+	if (!src) return dst;
+	for (var prop in src) if (has(src, prop)) {
+		if (src[prop] === null) {
+			delete dst[prop];
+		} else {
+			dst[prop] = src[prop];
+		}
+	}
+	return dst;
 }
 
 //
@@ -77,28 +96,18 @@ function invoke(list, filter, path) {
 }
 
 //
-// send the reply to remote side
+// normalize `this` socket to support passing contexts with functions over the wire
 //
-function reply(id /*, args */) {
-	console.log('SENDREPLY', arguments);
-	var args = slice.call(arguments, 1);
-	if (!id) return;
-	this.sendWithFunctions({
-		cmd: 'reply',
-		id: id,
-		params: args
-	});
-}
+function honorFunctions(context) {
 
-//
-// monkey patch the socket to support passing functions over the wire
-//
-function honorFunctions() {
+	var socket = this;
 
 	// constants
 	var THIS_IS_FUNC = '~-=(){}=-~';
 	var THIS_IS_FUNC_LEN = THIS_IS_FUNC.length;
 
+	// shared context
+	this.context = context || {};
 	// exposed functions
 	this.fns = {};
 	// callbacks
@@ -137,7 +146,8 @@ function honorFunctions() {
 		var self = this;
 		function replacer(k, v) {
 			// N.B. reparsed functions (having ids) no pasaran
-			if (_.isFunction(v) && !v.id) {
+			// N.B. `extend` is not transmitted also
+			if (_.isFunction(v) && !v.id && k !== 'extend') {
 				// FIXME: should not prepend with `k` in production
 				var fid = k + '_' + nonce();
 				self.fns[fid] = v;
@@ -146,7 +156,7 @@ function honorFunctions() {
 			return v;
 		}
 		var s = '~j~'+JSON.stringify(msg, replacer);
-		//console.log('SEND', s);
+		console.log('SEND', s);
 		this.send(s);
 	}
 
@@ -171,78 +181,79 @@ function honorFunctions() {
 		return result;
 	};
 
-/*if (false) {
-	var __onMessage = CLIENT_SIDE ? this.transport.constructor.prototype._onMessage : this._onMessage;
-	var self = this;
-	var revive = function revive(msg) {
-		if (msg.substring(0, 3) === '~j~') {
-			console.log('RECEIVED', msg);
-			this.base._onMessage(JSON.parse(msg.substring(3), function(k, v) {
-				// register each function in the context
-				// FIXME: shouldn't it be done in lazy way via getters?
-				// FIXME: how portable is it in browsers then?
-				if (v && typeof v === 'string' && v.substring(0, THIS_IS_FUNC_LEN) === THIS_IS_FUNC) {
-					// extract function id
-					var fid = v.substring(THIS_IS_FUNC_LEN);
-					// register the wrapper function
-					v = registerRemoteFunction.call(self, fid);
-				}
-				return v;
-			}));
-		} else {
-			__onMessage.call(this, msg);
+	//
+	// send the reply to remote side
+	//
+	this.reply = function(id /*, args */) {
+		console.log('SENDREPLY', arguments);
+		var args = slice.call(arguments, 1);
+		if (!id) return;
+		this.sendWithFunctions({
+			cmd: 'reply',
+			id: id,
+			params: args
+		});
+	};
+
+	//
+	// attach message handler
+	//
+	this.on('message', function(message) {
+		if (!message) return;
+		console.log('MESSAGE', message);
+		var fn;
+		// remote side calls this side method
+		if (message.cmd === 'call' && typeof message.method === 'string' && (fn = this.fns[message.method])) {
+			// the signature is fixed: function(callback[, arg1[, arg2[, ...]]])
+			// N.B. we will reply to caller only if message.id is given
+			var args = [_.bind(this.reply, this, message.id)];
+			// optional arguments come from message.params
+			if (message.params) {
+				message.params = this.parseWithFunctions(message.params);
+				push.apply(args, message.params);
+			}
+			fn.apply(this.context, args);
+		// uniquely identified reply from the remote side arrived
+		// given reply id, lookup and call corresponding callback
+		} else if (message.cmd === 'reply' && message.id && (fn = this.cbs[message.id])) {
+			// remove the callback to please GC
+			//delete this.cbs[message.id];
+			if (message.id !== 'context') delete this.cbs[message.id];
+			// callback
+			message.params = this.parseWithFunctions(message.params);
+			fn.apply(this.context, message.params);
 		}
-	}
-	//CLIENT_SIDE ? this.transport.constructor.prototype._onMessage = revive : this.__proto__.__proto__._onMessage = revive;
-	if (CLIENT_SIDE) {
-		this.transport.constructor.prototype._onMessage = revive;
-	} else {
-		this.parser._events.data = _.bind(revive, this);
-	}
-}*/
+	});
 
-}
-
-//
-// websocket message handler
-//
-function handler(message) {
-	if (!message) return;
-	console.log('MESSAGE', message);
-	var fn;
-	// remote side calls this side method
-	if (message.cmd === 'call' && typeof message.method === 'string' && (fn = this.fns[message.method])) {
-		// the signature is fixed: function(callback[, arg1[, arg2[, ...]]])
-		// N.B. we will reply to caller only if message.id is given
-		var args = [_.bind(reply, this, message.id)];
-		// optional arguments come from message.params
-		if (message.params) push.apply(args, message.params);
-		fn.apply(this.context, args);
-	// uniquely identified reply from the remote side arrived
-	// given reply id, lookup and call corresponding callback
-	} else if (message.cmd === 'reply' && message.id && (fn = this.cbs[message.id])) {
-		// remove the callback to please GC
-		//delete this.cbs[message.id];
-		if (message.id !== 'context') delete this.cbs[message.id];
-		// callback
-		message.params = this.parseWithFunctions(message.params);
-		fn.apply(this.context, message.params);
-	}
-}
-
-//
-// shallow extend the `dst` with properties of `src`
-//
-function extend(dst, src) {
-	if (!src) return dst;
-	for (var prop in src) if (has(src, prop)) {
-		if (src[prop] === null) {
-			delete dst[prop];
-		} else {
-			dst[prop] = src[prop];
+	//
+	// define 'context' callback
+	// FIXME: consider move out of `this.cbs` and simplify `this.cbs` flush logic
+	//
+	this.cbs.context = function(context, reset) {
+		// update the context
+		// N.B. do not overwrite socket.context, only mangle!
+		if (reset) {
+			socket.fns = {};
+			for (var i in socket.context) if (i !== 'extend') delete socket.context[i];
 		}
-	}
-	return dst;
+		extend(socket.context, context);
+		// notify remote end that context has changed
+		//socket.reply('context', context, reset);
+		// fire 'ready' callback
+		if (CLIENT_SIDE) {
+			_.isFunction(socket.options.ready) && socket.options.ready.call(this, reset);
+		}
+	};
+
+	//
+	// update shared context
+	//
+	this.context.extend = function(changes) {
+		extend(this, changes);
+		// notify remote end that context has changed
+		socket.reply('context', this);
+	};
+
 }
 
 //
@@ -269,31 +280,7 @@ if (CLIENT_SIDE) {
 		// create socket
 		var socket = new io.Socket(host, options);
 		// upgrade socket to honor functions
-		honorFunctions.call(socket);
-		// attach message handler
-		socket.on('message', _.bind(handler, socket));
-		// attach context
-		// N.B. do not overwrite socket.context, only mangle!
-		socket.context = this;
-		// define context update method
-		this.extend123 = function(changes) {
-			extend(this, changes);
-			// notify remote end that context has changed
-			reply.call(socket, 'context', this);
-		};
-		// define 'context' callback
-		socket.cbs.context = function(context, reset) {
-			//console.log('ARRIVED', arguments);
-			// update the context
-			if (reset) {
-				//for (var i in self) if (has(self, i) && i !== 'extend') delete self[i];
-				for (var i in self) delete self[i];
-				socket.fns = {};
-			}
-			extend(self, context);
-			// fire 'ready' callback
-			_.isFunction(options.ready) && options.ready.call(self, reset);
-		};
+		honorFunctions.call(socket, this);
 		// make connection
 		socket.connect();
 	};
@@ -312,34 +299,11 @@ if (CLIENT_SIDE) {
 		ws.on('connection', function(socket) {
 			// upgrade socket to honor functions
 			honorFunctions.call(socket);
-			// attach message handler
-			socket.on('message', _.bind(handler, socket));
-			// attach context
-			socket.context = {};
-			// define 'context' callback
-			socket.cbs.context = function(context, reset) {
-				// update the context
-				if (reset) {
-					socket.context = {};
-					socket.fns = {};
-				}
-				extend(socket.context, context);
-				// notify remote end that context has changed
-				reply.call(socket, 'context', context, reset);
-			};
 			// register the shared context locally and pass it to remote side
 			function register(context) {
 				//console.log('REGISTER', context);
 				// augment the context with unforgeable service methods
 				Object.defineProperties(context, {
-					extend: {
-						value: function(next, changes) {
-							// N.B. should be externally configurable, to allow checks before update
-							socket.cbs.context(changes);
-							_.isFunction(next) && next();
-						},
-						enumerable: true
-					},
 					signin: {
 						value: function(next, sid) {
 							init(sid);
@@ -350,6 +314,7 @@ if (CLIENT_SIDE) {
 				});
 				// reset the context
 				socket.cbs.context(context, true);
+				socket.reply('context', context, true);
 			}
 			//
 			// given session id, initialize the context
