@@ -80,7 +80,7 @@ function invoke(list, filter, path) {
 // send the reply to remote side
 //
 function reply(id /*, args */) {
-	console.log('REPLY', arguments);
+	console.log('SENDREPLY', arguments);
 	var args = slice.call(arguments, 1);
 	if (!id) return;
 	this.sendWithFunctions({
@@ -146,7 +146,7 @@ function honorFunctions() {
 			return v;
 		}
 		var s = '~j~'+JSON.stringify(msg, replacer);
-		console.log('SEND', s);
+		//console.log('SEND', s);
 		this.send(s);
 	}
 
@@ -208,7 +208,7 @@ function honorFunctions() {
 //
 function handler(message) {
 	if (!message) return;
-	console.log('MESSAGE', arguments);
+	console.log('MESSAGE', message);
 	var fn;
 	// remote side calls this side method
 	if (message.cmd === 'call' && typeof message.method === 'string' && (fn = this.fns[message.method])) {
@@ -228,6 +228,21 @@ function handler(message) {
 		message.params = this.parseWithFunctions(message.params);
 		fn.apply(this.context, message.params);
 	}
+}
+
+//
+// shallow extend the `dst` with properties of `src`
+//
+function extend(dst, src) {
+	if (!src) return dst;
+	for (var prop in src) if (has(src, prop)) {
+		if (src[prop] === null) {
+			delete dst[prop];
+		} else {
+			dst[prop] = src[prop];
+		}
+	}
+	return dst;
 }
 
 //
@@ -260,28 +275,27 @@ if (CLIENT_SIDE) {
 		// attach context
 		// N.B. do not overwrite socket.context, only mangle!
 		socket.context = this;
-		//
-		//
-		Object.defineProperty(this, 'socket', {value: socket});
-		//
-		//
+		// define context update method
+		this.extend123 = function(changes) {
+			extend(this, changes);
+			// notify remote end that context has changed
+			reply.call(socket, 'context', this);
+		};
 		// define 'context' callback
-		socket.cbs.context = function(error, context) {
+		socket.cbs.context = function(context, reset) {
+			//console.log('ARRIVED', arguments);
 			// update the context
-			for (var i in self) delete self[i];
-			_.extend(self, context);
+			if (reset) {
+				//for (var i in self) if (has(self, i) && i !== 'extend') delete self[i];
+				for (var i in self) delete self[i];
+				socket.fns = {};
+			}
+			extend(self, context);
 			// fire 'ready' callback
-			_.isFunction(options.ready) && options.ready.call(self);
+			_.isFunction(options.ready) && options.ready.call(self, reset);
 		};
 		// make connection
 		socket.connect();
-	};
-	Comm.prototype.extend = function(changes) {
-		if (changes) {
-			_.extend(this, changes);
-			// fire remote 'context' callback
-			reply.call(this.socket, 'context', null, this);
-		}
 	};
 
 } else {
@@ -303,17 +317,30 @@ if (CLIENT_SIDE) {
 			// attach context
 			socket.context = {};
 			// define 'context' callback
-			socket.cbs.context = function(error, context) {
+			socket.cbs.context = function(context, reset) {
 				// update the context
-				_.extend(socket.context, context);
+				if (reset) {
+					socket.context = {};
+					socket.fns = {};
+				}
+				extend(socket.context, context);
+				// notify remote end that context has changed
+				reply.call(socket, 'context', context, reset);
 			};
-			// deal with shared context
-			// N.B. this should be the only place which honors passing/receiving functions over the wire
+			// register the shared context locally and pass it to remote side
 			function register(context) {
 				//console.log('REGISTER', context);
 				// augment the context with unforgeable service methods
 				Object.defineProperties(context, {
-					login: {
+					extend: {
+						value: function(next, changes) {
+							// N.B. should be externally configurable, to allow checks before update
+							socket.cbs.context(changes);
+							_.isFunction(next) && next();
+						},
+						enumerable: true
+					},
+					signin: {
 						value: function(next, sid) {
 							init(sid);
 							_.isFunction(next) && next();
@@ -321,12 +348,8 @@ if (CLIENT_SIDE) {
 						enumerable: true
 					}
 				});
-				// reset functions
-				socket.fns = {};
-				// set the context
-				socket.context = context;
-				// fire remote 'context' callback
-				reply.call(socket, 'context', null, context);
+				// reset the context
+				socket.cbs.context(context, true);
 			}
 			//
 			// given session id, initialize the context
@@ -338,7 +361,6 @@ if (CLIENT_SIDE) {
 					// getter's arity is > 1? --> assume it's async
 					if (getContext.length > 1) {
 						getContext.call(socket, sid, function(err, result) {
-							// set this side context and send it to remote side
 							register(result);
 						});
 					// else assume it's sync
@@ -346,9 +368,9 @@ if (CLIENT_SIDE) {
 						register(getContext.call(socket, sid));
 					}
 				// context is already baked
-				// N.B. in this case there's no means to pass self into context's closures
+				// N.B. in this case there's no means to pass the socket into context's closures
 				} else {
-					register(getContext);
+					register(getContext || {});
 				}
 			}
 			//
@@ -368,6 +390,11 @@ if (CLIENT_SIDE) {
 			fc: {
 				get: function() {
 					return this.everyone[0].context;
+				}
+			},
+			ctx: {
+				get: function() {
+					return _.pluck(this.everyone, 'context');
 				}
 			}
 		});

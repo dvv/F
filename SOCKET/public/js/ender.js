@@ -2184,7 +2184,7 @@
 
   customHandler = function (element, fn, type, condition, args) {
     return function (event) {
-      if (condition ? condition.call(this, event) : event && event.propertyName == '_on' + type || !event) {
+      if (condition ? condition.call(this, event) : W3C_MODEL ? true : event && event.propertyName == '_on' + type || !event) {
         fn.apply(element, [event].concat(args));
       }
     };
@@ -2203,8 +2203,9 @@
       fn = custom.condition ? customHandler(element, fn, type, custom.condition) : fn;
       type = custom.base || type;
     }
-    var isNative = W3C_MODEL || nativeEvents[type];
+    var isNative = nativeEvents[type];
     fn = isNative ? nativeHandler(element, fn, args) : customHandler(element, fn, type, false, args);
+    isNative = W3C_MODEL || isNative;
     if (type == 'unload') {
       var org = fn;
       fn = function () {
@@ -2296,7 +2297,7 @@
     return element;
   },
 
-  fire = function (element, type) {
+  fire = function (element, type, args) {
     var evt, k, i, types = type.split(' ');
     for (i = types.length; i--;) {
       type = types[i].replace(stripName, '');
@@ -2306,13 +2307,13 @@
       if (isNamespace) {
         isNamespace = isNamespace.split('.');
         for (k = isNamespace.length; k--;) {
-          handlers[isNamespace[k]] && handlers[isNamespace[k]]();
+          handlers[isNamespace[k]] && handlers[isNamespace[k]].apply(element, args);
         }
-      } else if (element[eventSupport]) {
+      } else if (!args && element[eventSupport]) {
         fireListener(isNative, type, element);
       } else {
         for (k in handlers) {
-          handlers.hasOwnProperty(k) && handlers[k]();
+          handlers.hasOwnProperty(k) && handlers[k].apply(element, args);
         }
       }
     }

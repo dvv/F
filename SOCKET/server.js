@@ -31,12 +31,12 @@ function getContext(sid) {
 		Foo: {
 			get: function(next, index) {
 				console.log('Foo.get', arguments);
-				_.isFunction(next) && next(null, 'resulting');
+				_.isFunction(next) && next({result: 'resulting'});
 			},
 			Bar: {
 				deep: function(next, index) {
 					console.log('Foo.Bar.deep', arguments);
-					_.isFunction(next) && next('erroring');
+					_.isFunction(next) && next({error: 'erroring'});
 				}
 			}
 		},
@@ -49,18 +49,18 @@ function getContext(sid) {
 				return _.intersect(groups, g).length;
 			}, 'ping', this.name + ' ['+groups.join()+']' + ' says ' + msg);
 			//console.log('Post', r, arguments);
-			_.isFunction(next) && next(null, 'ack');
+			_.isFunction(next) && next();
 		},
 		groups: {},
 		join: function(next, group) {
 			this.groups[group] = {};
-			_.isFunction(next) && next(null, this.groups);
+			_.isFunction(next) && next(this.groups);
 		},
 		leave: function(next, group) {
 			_.each(Array.prototype.slice.call(arguments, 1), function(g) {
 				delete this.groups[g];
 			}, this);
-			_.isFunction(next) && next(null, this.groups);
+			_.isFunction(next) && next(this.groups);
 		}
 	});
 

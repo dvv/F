@@ -19,32 +19,35 @@
 			console.log('APPLOADED');//, _, io);
 			var caps = {
 				ping: function(cb, text) {
-					console.log('P', this);
 					$(this.lid).append('<li>' + (text || 'Server pings you, dude!') + '</li>');
 				}
 			};
 			// establish websocket connection #1
 			window.comm = window.comm1 = new Comm(null, {
-				context: function() {
-					console.log('CONTEXT!', this, arguments);
-					this.set(_.extend({}, caps, {name: 'dvv aka Vladimir', lid: '#l1'}));
+				ready: function(reset) {
+					console.log('READY!', this, reset);
+					if (!reset) return;
+					if (!this.user.id) return this.signin('123');
+					this.extend(_.extend({}, caps, {name: 'dvv aka Vladimir', lid: '#l1'}));
 				}
 			});
 if (false) {
 			// establish websocket connection #2
 			window.comm2 = new Comm(null, {
 				/* any other host and options you like! */
-				context: function() {
+				ready: function() {
 					console.log('CONTEXT!', this, arguments);
-					this.set(_.extend({}, caps, {name: 'Vladimir aka dvv', lid: '#l2'}));
+					if (!this.user.id) return this.signin('123');
+					this.extend(_.extend({}, caps, {name: 'Vladimir aka dvv', lid: '#l2'}));
 				}
 			});
 			// establish websocket connection #N
 			window.comm3 = new Comm(null, {
 				/* any other host and options you like! */
-				context: function() {
+				ready: function() {
 					console.log('CONTEXT!', this, arguments);
-					this.set(_.extend({}, caps, {name: 'dronnikov@gmail.com', lid: '#l3'}));
+					if (!this.user.id) return this.signin('123');
+					this.extend(_.extend({}, caps, {name: 'dronnikov@gmail.com', lid: '#l3'}));
 				}
 			});
 }
