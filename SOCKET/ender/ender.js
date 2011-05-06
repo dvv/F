@@ -1,48 +1,49 @@
 /*!
   * Ender: open module JavaScript framework
   * copyright Dustin Diaz & Jacob Thornton 2011 (@ded @fat)
-  * https://github.com/ender-js/ender
+  * https://ender.no.de
   * License MIT
-  * Build: ender build jeesh underscore-data
+  * Build: ender -b jeesh json-browser
   */
 !function (context) {
 
   function aug(o, o2) {
     for (var k in o2) {
-      k != 'noConflict' && (o[k] = o2[k]);
+      k != 'noConflict' && k != '_VERSION' && (o[k] = o2[k]);
     }
+    return o;
   }
 
-  function _$(s, r) {
-    this.elements = typeof s !== 'string' && !s.nodeType && typeof s.length !== 'undefined' ? s : $._select(s, r);
-    this.length = this.elements.length;
-    for (var i = 0; i < this.length; i++) {
-      this[i] = this.elements[i];
+  function boosh(s, r) {
+    var els;
+    if (ender._select && typeof s == 'string' || s.nodeName || s.length && 'item' in s) { //string || node || nodelist
+      els = ender._select(s, r);
+      els.selector = s;
+    } else {
+      els = isFinite(s.length) ? s : [s];
     }
+    return aug(els, boosh);
   }
 
-  function $(s, r) {
-    return new _$(s, r);
+  function ender(s, r) {
+    return boosh(s, r);
   }
 
-  aug($, {
-    ender: function (o, proto) {
-      aug(proto ? _$.prototype : $, o);
-    },
-    _select: function () {
-      return [];
+  aug(ender, {
+    _VERSION: '0.1.8',
+    ender: function (o, chain) {
+      aug(chain ? boosh : ender, o);
     }
   });
 
   var old = context.$;
-  $.noConflict = function () {
+  ender.noConflict = function () {
     context.$ = old;
     return this;
   };
 
-  (typeof module !== 'undefined') && module.exports ?
-    (module.exports = $) :
-    (context.$ = $);
+  (typeof module !== 'undefined') && module.exports && (module.exports = ender);
+  context.ender = context.$ = ender;
 
 }(this);
 !function () { var exports = {}, module = { exports: exports }; !function (doc) {
@@ -907,1207 +908,492 @@
 
 })();
  $.ender(module.exports); }();
-!function () { var exports = {}, module = { exports: exports }; (function() {
-  var Query, autoConverted, coerce, converters, encodeString, encodeValue, jsOperatorMap, operatorMap, operators, parse, plusMinus, query, queryToString, requires_array, stringToValue, stringify, valid_funcs, valid_operators, validate;
-  var __slice = Array.prototype.slice, __hasProp = Object.prototype.hasOwnProperty;
-  if (this._ === void 0 && this.$ !== void 0 && $.ender) {
-    this._ = $;
-    this._.mixin = this.$.ender;
-  }
-  'use strict';
-  /*
-   *
-   * Copyright(c) 2011 Vladimir Dronnikov <dronnikov@gmail.com>
-   * MIT Licensed
-   *
-  */
-  _.mixin({
-    isObject: function(value) {
-      return value && typeof value === 'object';
-    },
-    ensureArray: function(value) {
-      if (!value) {
-        if (value === void 0) {
-          return [];
-        } else {
-          return [value];
-        }
-      }
-      if (_.isString(value)) {
-        return [value];
-      }
-      return _.toArray(value);
-    },
-    toHash: function(list, field) {
-      var r;
-      r = {};
-      _.each(list, function(x) {
-        var f;
-        f = _.drill(x, field);
-        return r[f] = x;
-      });
-      return r;
-    },
-    freeze: function(obj) {
-      if (_.isObject(obj)) {
-        Object.freeze(obj);
-        _.each(obj, function(v, k) {
-          return _.freeze(v);
-        });
-      }
-      return obj;
-    },
-    proxy: function(obj, exposes) {
-      var facet;
-      facet = {};
-      _.each(exposes, function(definition) {
-        var name, prop;
-        if (_.isArray(definition)) {
-          name = definition[1];
-          prop = definition[0];
-          if (!_.isFunction(prop)) {
-            prop = _.drill(obj, prop);
-          }
-        } else {
-          name = definition;
-          prop = obj[name];
-        }
-        if (prop) {
-          return facet[name] = prop;
-        }
-      });
-      return Object.freeze(facet);
-    },
-    drill: function(obj, path, remove) {
-      var index, name, orig, part, _i, _j, _len, _len2, _ref;
-      if (_.isArray(path)) {
-        if (remove) {
-          _ref = path, path = 2 <= _ref.length ? __slice.call(_ref, 0, _i = _ref.length - 1) : (_i = 0, []), name = _ref[_i++];
-          orig = obj;
-          for (index = 0, _len = path.length; index < _len; index++) {
-            part = path[index];
-            obj = obj && obj[part];
-          }
-          if (obj != null ? obj[name] : void 0) {
-            delete obj[name];
-          }
-          return orig;
-        } else {
-          for (_j = 0, _len2 = path.length; _j < _len2; _j++) {
-            part = path[_j];
-            obj = obj && obj[part];
-          }
-          return obj;
-        }
-      } else if (path === void 0) {
-        return obj;
-      } else {
-        if (remove) {
-          delete obj[path];
-          return obj;
-        } else {
-          return obj[path];
-        }
-      }
-    }
-  });
-  _.mixin({
-    parseDate: function(value) {
-      var date, parts;
-      date = new Date(value);
-      if (_.isDate(date)) {
-        return date;
-      }
-      parts = String(value).match(/(\d+)/g);
-      return new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
-    },
-    isDate: function(obj) {
-      return !!((obj != null ? obj.getTimezoneOffset : void 0) && obj.setUTCFullYear && !_.isNaN(obj.getTime()));
-    }
-  });
-  'use strict';
-  /*
-   *
-   * Copyright(c) 2011 Vladimir Dronnikov <dronnikov@gmail.com>
-   * MIT Licensed
-   *
-  */
-  /*
-  	Rewrite of kriszyp's RQL https://github.com/kriszyp/rql
-  	Relies on documentcloud/underscore to normalize JS
-  */
-  operatorMap = {
-    '=': 'eq',
-    '==': 'eq',
-    '>': 'gt',
-    '>=': 'ge',
-    '<': 'lt',
-    '<=': 'le',
-    '!=': 'ne'
-  };
-  Query = (function() {
-    function Query(query, parameters) {
-      var k, leftoverCharacters, removeParentProperty, term, topTerm, v;
-      if (query == null) {
-        query = '';
-      }
-      term = this;
-      term.name = 'and';
-      term.args = [];
-      topTerm = term;
-      if (_.isObject(query)) {
-        if (_.isArray(query)) {
-          topTerm["in"]('id', query);
-          return;
-        } else if (query instanceof Query) {
-          query = query.toString();
-        } else {
-          for (k in query) {
-            if (!__hasProp.call(query, k)) continue;
-            v = query[k];
-            term = new Query();
-            topTerm.args.push(term);
-            term.name = 'eq';
-            term.args = [k, v];
-          }
-          return;
-        }
-      } else {
-        if (typeof query !== 'string') {
-          throw new URIError('Illegal query');
-        }
-      }
-      if (query.charAt(0) === '?') {
-        query = query.substring(1);
-      }
-      if (query.indexOf('/') >= 0) {
-        query = query.replace(/[\+\*\$\-:\w%\._]*\/[\+\*\$\-:\w%\._\/]*/g, function(slashed) {
-          return '(' + slashed.replace(/\//g, ',') + ')';
-        });
-      }
-      query = query.replace(/(\([\+\*\$\-:\w%\._,]+\)|[\+\*\$\-:\w%\._]*|)([<>!]?=(?:[\w]*=)?|>|<)(\([\+\*\$\-:\w%\._,]+\)|[\+\*\$\-:\w%\._]*|)/g, function(t, property, operator, value) {
-        if (operator.length < 3) {
-          if (!(operator in operatorMap)) {
-            throw new URIError('Illegal operator ' + operator);
-          }
-          operator = operatorMap[operator];
-        } else {
-          operator = operator.substring(1, operator.length - 1);
-        }
-        return operator + '(' + property + ',' + value + ')';
-      });
-      if (query.charAt(0) === '?') {
-        query = query.substring(1);
-      }
-      leftoverCharacters = query.replace(/(\))|([&\|,])?([\+\*\$\-:\w%\._]*)(\(?)/g, function(t, closedParen, delim, propertyOrValue, openParen) {
-        var isArray, newTerm, op;
-        if (delim) {
-          if (delim === '&') {
-            op = 'and';
-          } else if (delim === '|') {
-            op = 'or';
-          }
-          if (op) {
-            if (!term.name) {
-              term.name = op;
-            } else if (term.name !== op) {
-              throw new Error('Cannot mix conjunctions within a group, use parenthesis around each set of same conjuctions (& and |)');
-            }
-          }
-        }
-        if (openParen) {
-          newTerm = new Query();
-          newTerm.name = propertyOrValue;
-          newTerm.parent = term;
-          term.args.push(newTerm);
-          term = newTerm;
-        } else if (closedParen) {
-          isArray = !term.name;
-          term = term.parent;
-          if (!term) {
-            throw new URIError('Closing parenthesis without an opening parenthesis');
-          }
-          if (isArray) {
-            term.args.push(term.args.pop().args);
-          }
-        } else if (delim === ',') {
-          if (term.args.length === 0) {
-            term.args.push('');
-          }
-          term.args.push(stringToValue(propertyOrValue, parameters));
-        } else if (propertyOrValue) {
-          term.args.push(stringToValue(propertyOrValue, parameters));
-        }
-        return '';
-      });
-      if (term.parent) {
-        throw new URIError('Opening parenthesis without a closing parenthesis');
-      }
-      if (leftoverCharacters) {
-        throw new URIError('Illegal character in query string encountered ' + leftoverCharacters);
-      }
-      removeParentProperty = function(obj) {
-        if (obj != null ? obj.args : void 0) {
-          delete obj.parent;
-          _.each(obj.args, removeParentProperty);
-        }
-        return obj;
-      };
-      removeParentProperty(topTerm);
-    }
-    Query.prototype.toString = function() {
-      if (this.name === 'and') {
-        return _.map(this.args, queryToString).join('&');
-      } else {
-        return queryToString(this);
-      }
-    };
-    Query.prototype.where = function(query) {
-      this.args = this.args.concat(new Query(query).args);
-      return this;
-    };
-    Query.prototype.toSQL = function(options) {
-      if (options == null) {
-        options = {};
-      }
-      throw Error('Not implemented');
-    };
-    Query.prototype.toMongo = function(options) {
-      var result, search, walk;
-      if (options == null) {
-        options = {};
-      }
-      walk = function(name, terms) {
-        var search;
-        search = {};
-        _.each(terms || [], function(term) {
-          var args, func, key, limit, nested, pm, regex, x, y, _ref;
-          if (term == null) {
-            term = {};
-          }
-          func = term.name;
-          args = term.args;
-          if (!(func && args)) {
-            return;
-          }
-          if (_.isString((_ref = args[0]) != null ? _ref.name : void 0) && _.isArray(args[0].args)) {
-            if (_.include(valid_operators, func)) {
-              nested = walk(func, args);
-              search['$' + func] = nested;
-            }
-          } else {
-            if (func === 'sort' || func === 'select' || func === 'values') {
-              if (func === 'values') {
-                func = 'select';
-                options.values = true;
-              }
-              pm = plusMinus[func];
-              options[func] = {};
-              args = _.map(args, function(x) {
-                if (x === 'id' || x === '+id') {
-                  return '_id';
-                } else {
-                  return x;
-                }
-              });
-              args = _.map(args, function(x) {
-                if (x === '-id') {
-                  return '-_id';
-                } else {
-                  return x;
-                }
-              });
-              _.each(args, function(x, index) {
+!function () { var exports = {}, module = { exports: exports }; /*
+    http://www.JSON.org/json2.js
+    2011-02-23
+
+    Public Domain.
+
+    NO WARRANTY EXPRESSED OR IMPLIED. USE AT YOUR OWN RISK.
+
+    See http://www.JSON.org/js.html
+
+
+    This code should be minified before deployment.
+    See http://javascript.crockford.com/jsmin.html
+
+    USE YOUR OWN COPY. IT IS EXTREMELY UNWISE TO LOAD CODE FROM SERVERS YOU DO
+    NOT CONTROL.
+
+
+    This file creates a global JSON object containing two methods: stringify
+    and parse.
+
+        JSON.stringify(value, replacer, space)
+            value       any JavaScript value, usually an object or array.
+
+            replacer    an optional parameter that determines how object
+                        values are stringified for objects. It can be a
+                        function or an array of strings.
+
+            space       an optional parameter that specifies the indentation
+                        of nested structures. If it is omitted, the text will
+                        be packed without extra whitespace. If it is a number,
+                        it will specify the number of spaces to indent at each
+                        level. If it is a string (such as '\t' or '&nbsp;'),
+                        it contains the characters used to indent at each level.
+
+            This method produces a JSON text from a JavaScript value.
+
+            When an object value is found, if the object contains a toJSON
+            method, its toJSON method will be called and the result will be
+            stringified. A toJSON method does not serialize: it returns the
+            value represented by the name/value pair that should be serialized,
+            or undefined if nothing should be serialized. The toJSON method
+            will be passed the key associated with the value, and this will be
+            bound to the value
+
+            For example, this would serialize Dates as ISO strings.
+
+                Date.prototype.toJSON = function (key) {
+                    function f(n) {
+                        // Format integers to have at least two digits.
+                        return n < 10 ? '0' + n : n;
+                    }
+
+                    return this.getUTCFullYear()   + '-' +
+                         f(this.getUTCMonth() + 1) + '-' +
+                         f(this.getUTCDate())      + 'T' +
+                         f(this.getUTCHours())     + ':' +
+                         f(this.getUTCMinutes())   + ':' +
+                         f(this.getUTCSeconds())   + 'Z';
+                };
+
+            You can provide an optional replacer method. It will be passed the
+            key and value of each member, with this bound to the containing
+            object. The value that is returned from your method will be
+            serialized. If your method returns undefined, then the member will
+            be excluded from the serialization.
+
+            If the replacer parameter is an array of strings, then it will be
+            used to select the members to be serialized. It filters the results
+            such that only members with keys listed in the replacer array are
+            stringified.
+
+            Values that do not have JSON representations, such as undefined or
+            functions, will not be serialized. Such values in objects will be
+            dropped; in arrays they will be replaced with null. You can use
+            a replacer function to replace those with JSON values.
+            JSON.stringify(undefined) returns undefined.
+
+            The optional space parameter produces a stringification of the
+            value that is filled with line breaks and indentation to make it
+            easier to read.
+
+            If the space parameter is a non-empty string, then that string will
+            be used for indentation. If the space parameter is a number, then
+            the indentation will be that many spaces.
+
+            Example:
+
+            text = JSON.stringify(['e', {pluribus: 'unum'}]);
+            // text is '["e",{"pluribus":"unum"}]'
+
+
+            text = JSON.stringify(['e', {pluribus: 'unum'}], null, '\t');
+            // text is '[\n\t"e",\n\t{\n\t\t"pluribus": "unum"\n\t}\n]'
+
+            text = JSON.stringify([new Date()], function (key, value) {
+                return this[key] instanceof Date ?
+                    'Date(' + this[key] + ')' : value;
+            });
+            // text is '["Date(---current time---)"]'
+
+
+        JSON.parse(text, reviver)
+            This method parses a JSON text to produce an object or array.
+            It can throw a SyntaxError exception.
+
+            The optional reviver parameter is a function that can filter and
+            transform the results. It receives each of the keys and values,
+            and its return value is used instead of the original value.
+            If it returns what it received, then the structure is not modified.
+            If it returns undefined then the member is deleted.
+
+            Example:
+
+            // Parse the text. Values that look like ISO date strings will
+            // be converted to Date objects.
+
+            myData = JSON.parse(text, function (key, value) {
                 var a;
-                if (_.isArray(x)) {
-                  x = x.join('.');
+                if (typeof value === 'string') {
+                    a =
+/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}(?:\.\d*)?)Z$/.exec(value);
+                    if (a) {
+                        return new Date(Date.UTC(+a[1], +a[2] - 1, +a[3], +a[4],
+                            +a[5], +a[6]));
+                    }
                 }
-                a = /([-+]*)(.+)/.exec(x);
-                return options[func][a[2]] = pm[(a[1].charAt(0) === '-') * 1] * (index + 1);
-              });
-              return;
-            } else if (func === 'limit') {
-              limit = args;
-              options.skip = +limit[1] || 0;
-              options.limit = +limit[0] || Infinity;
-              options.needCount = true;
-              return;
-            }
-            if (func === 'le') {
-              func = 'lte';
-            } else if (func === 'ge') {
-              func = 'gte';
-            }
-            key = args[0];
-            args = args.slice(1);
-            if (_.isArray(key)) {
-              key = key.join('.');
-            }
-            if (String(key).charAt(0) === '$') {
-              return;
-            }
-            if (key === 'id') {
-              key = '_id';
-            }
-            if (_.include(requires_array, func)) {
-              args = args[0];
-            } else if (func === 'match') {
-              func = 'eq';
-              regex = new RegExp;
-              regex.compile.apply(regex, args);
-              args = regex;
-            } else {
-              args = args.length === 1 ? args[0] : args.join();
-            }
-            if (func === 'ne' && _.isRegExp(args)) {
-              func = 'not';
-            }
-            if (_.include(valid_funcs, func)) {
-              func = '$' + func;
-            } else {
-              return;
-            }
-            if (name === 'or') {
-              if (!_.isArray(search)) {
-                search = [];
-              }
-              x = {};
-              if (func === '$eq') {
-                x[key] = args;
-              } else {
-                y = {};
-                y[func] = args;
-                x[key] = y;
-              }
-              search.push(x);
-            } else {
-              if (search[key] === void 0) {
-                search[key] = {};
-              }
-              if (_.isObject(search[key]) && !_.isArray(search[key])) {
-                search[key][func] = args;
-              }
-              if (func === '$eq') {
-                search[key] = args;
-              }
-            }
-          }
-        });
-        return search;
-      };
-      search = walk(this.name, this.args);
-      if (options.select) {
-        options.fields = options.select;
-        delete options.select;
-      }
-      result = {
-        meta: options,
-        search: search
-      };
-      if (this.error) {
-        result.error = this.error;
-      }
-      return result;
-    };
-    return Query;
-  })();
-  stringToValue = function(string, parameters) {
-    var converter, param_index, parts;
-    converter = converters["default"];
-    if (string.charAt(0) === '$') {
-      param_index = parseInt(string.substring(1), 10) - 1;
-      if (param_index >= 0 && parameters) {
-        return parameters[param_index];
-      } else {
-        return;
-      }
-    }
-    if (string.indexOf(':') >= 0) {
-      parts = string.split(':', 2);
-      converter = converters[parts[0]];
-      if (!converter) {
-        throw new URIError('Unknown converter ' + parts[0]);
-      }
-      string = parts[1];
-    }
-    return converter(string);
-  };
-  queryToString = function(part) {
-    var mapped;
-    if (_.isArray(part)) {
-      mapped = _.map(part, function(arg) {
-        return queryToString(arg);
-      });
-      return '(' + mapped.join(',') + ')';
-    } else if (part && part.name && part.args) {
-      mapped = _.map(part.args, function(arg) {
-        return queryToString(arg);
-      });
-      return part.name + '(' + mapped.join(',') + ')';
-    } else {
-      return encodeValue(part);
-    }
-  };
-  encodeString = function(s) {
-    if (_.isString(s)) {
-      s = encodeURIComponent(s);
-      if (s.match(/[\(\)]/)) {
-        s = s.replace('(', '%28').replace(')', '%29');
-      }
-    }
-    return s;
-  };
-  encodeValue = function(val) {
-    var encoded, i, type;
-    if (val === null) {
-      return 'null';
-    } else if (typeof val === 'undefined') {
-      return val;
-    }
-    if (val !== converters["default"]('' + (val.toISOString && val.toISOString() || val.toString()))) {
-      if (_.isRegExp(val)) {
-        val = val.toString();
-        i = val.lastIndexOf('/');
-        type = val.substring(i).indexOf('i') >= 0 ? 're' : 'RE';
-        val = encodeString(val.substring(1, i));
-        encoded = true;
-      } else if (_.isDate(val)) {
-        type = 'epoch';
-        val = val.getTime();
-        encoded = true;
-      } else if (_.isString(type)) {
-        type = 'string';
-        val = encodeString(val);
-        encoded = true;
-      } else {
-        type = typeof val;
-      }
-      val = [type, val].join(':');
-    }
-    if (!encoded && _.isString(val)) {
-      val = encodeString(val);
-    }
-    return val;
-  };
-  autoConverted = {
-    'true': true,
-    'false': false,
-    'null': null,
-    'undefined': void 0,
-    'Infinity': Infinity,
-    '-Infinity': -Infinity
-  };
-  converters = {
-    auto: function(string) {
-      var number;
-      if (string in autoConverted) {
-        return autoConverted[string];
-      }
-      number = +string;
-      if (_.isNaN(number) || number.toString() !== string) {
-        string = decodeURIComponent(string);
-        return string;
-      }
-      return number;
-    },
-    number: function(x) {
-      var number;
-      number = +x;
-      if (_.isNaN(number)) {
-        throw new URIError('Invalid number ' + x);
-      }
-      return number;
-    },
-    epoch: function(x) {
-      var date;
-      date = new Date(+x);
-      if (!_.isDate(date)) {
-        throw new URIError('Invalid date ' + x);
-      }
-      return date;
-    },
-    isodate: function(x) {
-      var date;
-      date = '0000'.substr(0, 4 - x.length) + x;
-      date += '0000-01-01T00:00:00Z'.substring(date.length);
-      return converters.date(date);
-    },
-    date: function(x) {
-      var date, isoDate;
-      isoDate = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}(?:\.\d*)?)Z$/.exec(x);
-      if (isoDate) {
-        date = new Date(Date.UTC(+isoDate[1], +isoDate[2] - 1, +isoDate[3], +isoDate[4], +isoDate[5], +isoDate[6]));
-      } else {
-        date = _.parseDate(x);
-      }
-      if (!_.isDate(date)) {
-        throw new URIError('Invalid date ' + x);
-      }
-      return date;
-    },
-    boolean: function(x) {
-      if (x === 'false') {
-        return false;
-      } else {
-        return !!x;
-      }
-    },
-    string: function(string) {
-      return decodeURIComponent(string);
-    },
-    re: function(x) {
-      return new RegExp(decodeURIComponent(x), 'i');
-    },
-    RE: function(x) {
-      return new RegExp(decodeURIComponent(x));
-    },
-    glob: function(x) {
-      var s;
-      s = decodeURIComponent(x).replace(/([\\|\||\(|\)|\[|\{|\^|\$|\*|\+|\?|\.|\<|\>])/g, function(x) {
-        return '\\' + x;
-      });
-      s = s.replace(/\\\*/g, '.*').replace(/\\\?/g, '.?');
-      s = s.substring(0, 2) !== '.*' ? '^' + s : s.substring(2);
-      s = s.substring(s.length - 2) !== '.*' ? s + '$' : s.substring(0, s.length - 2);
-      return new RegExp(s, 'i');
-    }
-  };
-  converters["default"] = converters.auto;
-  _.each(['eq', 'ne', 'le', 'ge', 'lt', 'gt', 'between', 'in', 'nin', 'contains', 'ncontains', 'or', 'and'], function(op) {
-    return Query.prototype[op] = function() {
-      var args;
-      args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-      this.args.push({
-        name: op,
-        args: args
-      });
-      return this;
-    };
-  });
-  parse = function(query, parameters) {
-    var q;
-    try {
-      q = new Query(query, parameters);
-    } catch (x) {
-      q = new Query;
-      q.error = x.message;
-    }
-    return q;
-  };
-  valid_funcs = ['eq', 'ne', 'lt', 'lte', 'gt', 'gte', 'in', 'nin', 'not', 'mod', 'all', 'size', 'exists', 'type', 'elemMatch'];
-  requires_array = ['in', 'nin', 'all', 'mod'];
-  valid_operators = ['or', 'and', 'not'];
-  plusMinus = {
-    sort: [1, -1],
-    select: [1, 0]
-  };
-  jsOperatorMap = {
-    'eq': '===',
-    'ne': '!==',
-    'le': '<=',
-    'ge': '>=',
-    'lt': '<',
-    'gt': '>'
-  };
-  operators = {
-    and: function() {
-      var cond, conditions, obj, _i, _len;
-      obj = arguments[0], conditions = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      for (_i = 0, _len = conditions.length; _i < _len; _i++) {
-        cond = conditions[_i];
-        if (_.isFunction(cond)) {
-          obj = cond(obj);
-        }
-      }
-      return obj;
-    },
-    or: function() {
-      var cond, conditions, list, obj, _i, _len;
-      obj = arguments[0], conditions = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      list = [];
-      for (_i = 0, _len = conditions.length; _i < _len; _i++) {
-        cond = conditions[_i];
-        if (_.isFunction(cond)) {
-          list = list.concat(cond(obj));
-        }
-      }
-      return _.uniq(list);
-    },
-    limit: function(list, limit, start) {
-      if (start == null) {
-        start = 0;
-      }
-      return list.slice(start, start + limit);
-    },
-    slice: function(list, start, end) {
-      if (start == null) {
-        start = 0;
-      }
-      if (end == null) {
-        end = Infinity;
-      }
-      return list.slice(start, end);
-    },
-    pick: function() {
-      var exclude, include, list, props;
-      list = arguments[0], props = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      include = [];
-      exclude = [];
-      _.each(props, function(x, index) {
-        var a, leading;
-        leading = _.isArray(x) ? x[0] : x;
-        a = /([-+]*)(.+)/.exec(leading);
-        if (_.isArray(x)) {
-          x[0] = a[2];
-        } else {
-          x = a[2];
-        }
-        if (a[1].charAt(0) === '-') {
-          return exclude.push(x);
-        } else {
-          return include.push(x);
-        }
-      });
-      return _.map(list, function(item) {
-        var i, n, s, selected, t, value, x, _i, _j, _k, _len, _len2, _len3, _ref;
-        if (_.isEmpty(include)) {
-          selected = _.clone(item);
-        } else {
-          selected = {};
-          for (_i = 0, _len = include.length; _i < _len; _i++) {
-            x = include[_i];
-            value = _.drill(item, x);
-            if (value === void 0) {
-              continue;
-            }
-            if (_.isArray(x)) {
-              t = s = selected;
-              n = x.slice(-1);
-              for (_j = 0, _len2 = x.length; _j < _len2; _j++) {
-                i = x[_j];
-                (_ref = t[i]) != null ? _ref : t[i] = {};
-                s = t;
-                t = t[i];
-              }
-              s[n] = value;
-            } else {
-              selected[x] = value;
-            }
-          }
-        }
-        for (_k = 0, _len3 = exclude.length; _k < _len3; _k++) {
-          x = exclude[_k];
-          _.drill(selected, x, true);
-        }
-        return selected;
-      });
-    },
-    values: function() {
-      return _.map(operators.pick.apply(this, arguments), _.values);
-    },
-    sort: function() {
-      var list, order, props;
-      list = arguments[0], props = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      order = [];
-      _.each(props, function(x, index) {
-        var a, leading;
-        leading = _.isArray(x) ? x[0] : x;
-        a = /([-+]*)(.+)/.exec(leading);
-        if (_.isArray(x)) {
-          x[0] = a[2];
-        } else {
-          x = a[2];
-        }
-        if (a[1].charAt(0) === '-') {
-          return order.push({
-            attr: x,
-            order: -1
-          });
-        } else {
-          return order.push({
-            attr: x,
-            order: 1
-          });
-        }
-      });
-      return list.sort(function(a, b) {
-        var prop, va, vb, _i, _len;
-        for (_i = 0, _len = order.length; _i < _len; _i++) {
-          prop = order[_i];
-          va = _.drill(a, prop.attr);
-          vb = _.drill(b, prop.attr);
-          if (va > vb) {
-            return prop.order;
-          } else {
-            if (va !== vb) {
-              return -prop.order;
-            }
-          }
-        }
-        return 0;
-      });
-    },
-    match: function(list, prop, regex) {
-      if (!_.isRegExp(regex)) {
-        regex = new RegExp(regex, 'i');
-      }
-      return _.select(list, function(x) {
-        return regex.test(_.drill(x, prop));
-      });
-    },
-    nmatch: function(list, prop, regex) {
-      if (!_.isRegExp(regex)) {
-        regex = new RegExp(regex, 'i');
-      }
-      return _.select(list, function(x) {
-        return !regex.test(_.drill(x, prop));
-      });
-    },
-    "in": function(list, prop, values) {
-      values = _.ensureArray(values);
-      return _.select(list, function(x) {
-        return _.include(values, _.drill(x, prop));
-      });
-    },
-    nin: function(list, prop, values) {
-      values = _.ensureArray(values);
-      return _.select(list, function(x) {
-        return !_.include(values, _.drill(x, prop));
-      });
-    },
-    contains: function(list, prop, value) {
-      return _.select(list, function(x) {
-        return _.include(_.drill(x, prop), value);
-      });
-    },
-    ncontains: function(list, prop, value) {
-      return _.select(list, function(x) {
-        return !_.include(_.drill(x, prop), value);
-      });
-    },
-    between: function(list, prop, minInclusive, maxExclusive) {
-      return _.select(list, function(x) {
-        var _ref;
-        return (minInclusive <= (_ref = _.drill(x, prop)) && _ref < maxExclusive);
-      });
-    },
-    nbetween: function(list, prop, minInclusive, maxExclusive) {
-      return _.select(list, function(x) {
-        var _ref;
-        return !((minInclusive <= (_ref = _.drill(x, prop)) && _ref < maxExclusive));
-      });
-    }
-  };
-  operators.select = operators.pick;
-  operators.out = operators.nin;
-  operators.excludes = operators.ncontains;
-  operators.distinct = _.uniq;
-  stringify = function(str) {
-    return '"' + String(str).replace(/"/g, '\\"') + '"';
-  };
-  query = function(list, query, options) {
-    var expr, queryToJS;
-    if (options == null) {
-      options = {};
-    }
-    query = parse(query, options.parameters);
-    if (query.error) {
-      return [];
-    }
-    queryToJS = function(value) {
-      var condition, escaped, item, p, path, prm, testValue, _i, _len;
-      if (_.isObject(value) && !_.isRegExp(value)) {
-        if (_.isArray(value)) {
-          return '[' + _.map(value, queryToJS) + ']';
-        } else {
-          if (value.name in jsOperatorMap) {
-            path = value.args[0];
-            prm = value.args[1];
-            item = 'item';
-            if (prm === void 0) {
-              prm = path;
-            } else if (_.isArray(path)) {
-              escaped = [];
-              for (_i = 0, _len = path.length; _i < _len; _i++) {
-                p = path[_i];
-                escaped.push(stringify(p));
-                item += '&&item[' + escaped.join('][') + ']';
-              }
-            } else {
-              item += '&&item[' + stringify(path) + ']';
-            }
-            testValue = queryToJS(prm);
-            if (_.isRegExp(testValue)) {
-              condition = testValue + (".test(" + item + ")");
-              if (value.name !== 'eq') {
-                condition = "!(" + condition + ")";
-              }
-            } else {
-              condition = item + jsOperatorMap[value.name] + testValue;
-            }
-            return "function(list){return _.select(list,function(item){return " + condition + ";});}";
-          } else if (value.name in operators) {
-            return ("function(list){return operators['" + value.name + "'](") + ['list'].concat(_.map(value.args, queryToJS)).join(',') + ');}';
-          } else {
-            return "function(list){return _.select(list,function(item){return false;});}";
-          }
-        }
-      } else {
-        if (_.isString(value)) {
-          return stringify(value);
-        } else {
-          return value;
-        }
-      }
-    };
-    expr = queryToJS(query).slice(15, -1);
-    if (list) {
-      return (new Function('list, operators', expr))(list, operators);
-    } else {
-      return expr;
-    }
-  };
-  _.mixin({
-    rql: parse,
-    query: query
-  });
-  'use strict';
-  /*
+                return value;
+            });
 
-  	JSONSchema Validator - Validates JavaScript objects using JSON Schemas
-  	(http://www.json.com/json-schema-proposal/)
-
-  	Copyright (c) 2007 Kris Zyp SitePen (www.sitepen.com)
-  	Copyright (c) 2011 Vladimir Dronnikov dronnikov@gmail.com
-
-  	Licensed under the MIT (MIT-LICENSE.txt) license
-
-  */
-  /*
-   *
-   * Copyright(c) 2011 Vladimir Dronnikov <dronnikov@gmail.com>
-   * MIT Licensed
-   *
-  */
-  /*
-  	Rewrite of kriszyp's json-schema validator https://github.com/kriszyp/json-schema
-  	Relies on documentcloud/underscore to normalize JS
-  */
-  coerce = function(value, type) {
-    var date;
-    if (type === 'string') {
-      value = value != null ? String(value) : '';
-    } else if (type === 'number' || type === 'integer') {
-      if (!_.isNaN(value)) {
-        value = Number(value);
-        if (type === 'integer') {
-          value = Math.floor(value);
-        }
-      }
-    } else if (type === 'boolean') {
-      value = value === 'false' ? false : !!value;
-    } else if (type === 'null') {
-      value = null;
-    } else if (type === 'object') {
-      if (typeof JSON != "undefined" && JSON !== null ? JSON.parse : void 0) {
-        try {
-          value = JSON.parse(value);
-        } catch (err) {
-
-        }
-      }
-    } else if (type === 'array') {
-      value = _.ensureArray(value);
-    } else if (type === 'date') {
-      date = _.parseDate(value);
-      if (_.isDate(date)) {
-        value = date;
-      }
-    }
-    return value;
-  };
-  validate = function(instance, schema, options, callback) {
-    var async, asyncs, checkObj, checkProp, errors, i, len, self, _changing, _fn, _len;
-    if (options == null) {
-      options = {};
-    }
-    self = this;
-    _changing = options.changing;
-    asyncs = [];
-    errors = [];
-    checkProp = function(value, schema, path, i) {
-      var addError, checkType, enumeration, itemsIsArray, propDef, v, _len;
-      if (path) {
-        if (_.isNumber(i)) {
-          path += '[' + i + ']';
-        } else if (i === void 0) {
-          path += '';
-        } else {
-          path += '.' + i;
-        }
-      } else {
-        path += i;
-      }
-      addError = function(message) {
-        return errors.push({
-          property: path,
-          message: message
-        });
-      };
-      if ((typeof schema !== 'object' || _.isArray(schema)) && (path || typeof schema !== 'function') && !(schema != null ? schema.type : void 0)) {
-        if (_.isFunction(schema)) {
-          if (!(value instanceof schema)) {
-            addError('type');
-          }
-        } else if (schema) {
-          addError('invalid');
-        }
-        return null;
-      }
-      if (_changing && schema.readonly) {
-        addError('readonly');
-      }
-      if (schema["extends"]) {
-        checkProp(value, schema["extends"], path, i);
-      }
-      checkType = function(type, value) {
-        var priorErrors, t, theseErrors, unionErrors, _i, _len;
-        if (type) {
-          if (typeof type === 'string' && type !== 'any' && (type == 'null' ? value !== null : typeof value !== type) &&
-						!(type === 'array' && _.isArray(value)) &&
-						!(type === 'date' && _.isDate(value)) &&
-						!(type === 'integer' && value%1===0)) {
-            return [
-              {
-                property: path,
-                message: 'type'
-              }
-            ];
-          }
-          if (_.isArray(type)) {
-            unionErrors = [];
-            for (_i = 0, _len = type.length; _i < _len; _i++) {
-              t = type[_i];
-              unionErrors = checkType(t, value);
-              if (!unionErrors.length) {
-                break;
-              }
-            }
-            if (unionErrors.length) {
-              return unionErrors;
-            }
-          } else if (typeof type === 'object') {
-            priorErrors = errors;
-            errors = [];
-            checkProp(value, type, path);
-            theseErrors = errors;
-            errors = priorErrors;
-            return theseErrors;
-          }
-        }
-        return [];
-      };
-      if (value === void 0) {
-        if ((!schema.optional || typeof schema.optional === 'object' && !schema.optional[options.flavor]) && !schema.get && !(schema["default"] != null)) {
-          addError('required');
-        }
-      } else {
-        errors = errors.concat(checkType(schema.type, value));
-        if (schema.disallow && !checkType(schema.disallow, value).length) {
-          addError('disallowed');
-        }
-        if (value !== null) {
-          if (_.isArray(value)) {
-            if (schema.items) {
-              itemsIsArray = _.isArray(schema.items);
-              propDef = schema.items;
-              for (i = 0, _len = value.length; i < _len; i++) {
-                v = value[i];
-                if (itemsIsArray) {
-                  propDef = schema.items[i];
+            myData = JSON.parse('["Date(09/09/2001)"]', function (key, value) {
+                var d;
+                if (typeof value === 'string' &&
+                        value.slice(0, 5) === 'Date(' &&
+                        value.slice(-1) === ')') {
+                    d = new Date(value.slice(5, -1));
+                    if (d) {
+                        return d;
+                    }
                 }
-                if (options.coerce && propDef.type) {
-                  value[i] = coerce(v, propDef.type);
+                return value;
+            });
+
+
+    This is a reference implementation. You are free to copy, modify, or
+    redistribute.
+*/
+
+/*jslint evil: true, strict: false, regexp: false */
+
+/*members "", "\b", "\t", "\n", "\f", "\r", "\"", JSON, "\\", apply,
+    call, charCodeAt, getUTCDate, getUTCFullYear, getUTCHours,
+    getUTCMinutes, getUTCMonth, getUTCSeconds, hasOwnProperty, join,
+    lastIndex, length, parse, prototype, push, replace, slice, stringify,
+    test, toJSON, toString, valueOf
+*/
+
+
+// Create a JSON object only if one does not already exist. We create the
+// methods in a closure to avoid creating global variables.
+
+var JSON;
+if (!JSON) {
+    JSON = {};
+}
+
+(function () {
+    "use strict";
+
+    function f(n) {
+        // Format integers to have at least two digits.
+        return n < 10 ? '0' + n : n;
+    }
+
+    if (typeof Date.prototype.toJSON !== 'function') {
+
+        Date.prototype.toJSON = function (key) {
+
+            return isFinite(this.valueOf()) ?
+                this.getUTCFullYear()     + '-' +
+                f(this.getUTCMonth() + 1) + '-' +
+                f(this.getUTCDate())      + 'T' +
+                f(this.getUTCHours())     + ':' +
+                f(this.getUTCMinutes())   + ':' +
+                f(this.getUTCSeconds())   + 'Z' : null;
+        };
+
+        String.prototype.toJSON      =
+            Number.prototype.toJSON  =
+            Boolean.prototype.toJSON = function (key) {
+                return this.valueOf();
+            };
+    }
+
+    var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
+        escapable = /[\\\"\x00-\x1f\x7f-\x9f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
+        gap,
+        indent,
+        meta = {    // table of character substitutions
+            '\b': '\\b',
+            '\t': '\\t',
+            '\n': '\\n',
+            '\f': '\\f',
+            '\r': '\\r',
+            '"' : '\\"',
+            '\\': '\\\\'
+        },
+        rep;
+
+
+    function quote(string) {
+
+// If the string contains no control characters, no quote characters, and no
+// backslash characters, then we can safely slap some quotes around it.
+// Otherwise we must also replace the offending characters with safe escape
+// sequences.
+
+        escapable.lastIndex = 0;
+        return escapable.test(string) ? '"' + string.replace(escapable, function (a) {
+            var c = meta[a];
+            return typeof c === 'string' ? c :
+                '\\u' + ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+        }) + '"' : '"' + string + '"';
+    }
+
+
+    function str(key, holder) {
+
+// Produce a string from holder[key].
+
+        var i,          // The loop counter.
+            k,          // The member key.
+            v,          // The member value.
+            length,
+            mind = gap,
+            partial,
+            value = holder[key];
+
+// If the value has a toJSON method, call it to obtain a replacement value.
+
+        if (value && typeof value === 'object' &&
+                typeof value.toJSON === 'function') {
+            value = value.toJSON(key);
+        }
+
+// If we were called with a replacer function, then call the replacer to
+// obtain a replacement value.
+
+        if (typeof rep === 'function') {
+            value = rep.call(holder, key, value);
+        }
+
+// What happens next depends on the value's type.
+
+        switch (typeof value) {
+        case 'string':
+            return quote(value);
+
+        case 'number':
+
+// JSON numbers must be finite. Encode non-finite numbers as null.
+
+            return isFinite(value) ? String(value) : 'null';
+
+        case 'boolean':
+        case 'null':
+
+// If the value is a boolean or null, convert it to a string. Note:
+// typeof null does not produce 'null'. The case is included here in
+// the remote chance that this gets fixed someday.
+
+            return String(value);
+
+// If the type is 'object', we might be dealing with an object or an array or
+// null.
+
+        case 'object':
+
+// Due to a specification blunder in ECMAScript, typeof null is 'object',
+// so watch out for that case.
+
+            if (!value) {
+                return 'null';
+            }
+
+// Make an array to hold the partial results of stringifying this object value.
+
+            gap += indent;
+            partial = [];
+
+// Is the value an array?
+
+            if (Object.prototype.toString.apply(value) === '[object Array]') {
+
+// The value is an array. Stringify every element. Use null as a placeholder
+// for non-JSON values.
+
+                length = value.length;
+                for (i = 0; i < length; i += 1) {
+                    partial[i] = str(i, value) || 'null';
                 }
-                errors.concat(checkProp(v, propDef, path, i));
-              }
+
+// Join all of the elements together, separated with commas, and wrap them in
+// brackets.
+
+                v = partial.length === 0 ? '[]' : gap ?
+                    '[\n' + gap + partial.join(',\n' + gap) + '\n' + mind + ']' :
+                    '[' + partial.join(',') + ']';
+                gap = mind;
+                return v;
             }
-            if (schema.minItems && value.length < schema.minItems) {
-              addError('minItems');
+
+// If the replacer is an array, use it to select the members to be stringified.
+
+            if (rep && typeof rep === 'object') {
+                length = rep.length;
+                for (i = 0; i < length; i += 1) {
+                    if (typeof rep[i] === 'string') {
+                        k = rep[i];
+                        v = str(k, value);
+                        if (v) {
+                            partial.push(quote(k) + (gap ? ': ' : ':') + v);
+                        }
+                    }
+                }
+            } else {
+
+// Otherwise, iterate through all of the keys in the object.
+
+                for (k in value) {
+                    if (Object.prototype.hasOwnProperty.call(value, k)) {
+                        v = str(k, value);
+                        if (v) {
+                            partial.push(quote(k) + (gap ? ': ' : ':') + v);
+                        }
+                    }
+                }
             }
-            if (schema.maxItems && value.length > schema.maxItems) {
-              addError('maxItems');
+
+// Join all of the member texts together, separated with commas,
+// and wrap them in braces.
+
+            v = partial.length === 0 ? '{}' : gap ?
+                '{\n' + gap + partial.join(',\n' + gap) + '\n' + mind + '}' :
+                '{' + partial.join(',') + '}';
+            gap = mind;
+            return v;
+        }
+    }
+
+// If the JSON object does not yet have a stringify method, give it one.
+
+    if (typeof JSON.stringify !== 'function') {
+        JSON.stringify = function (value, replacer, space) {
+
+// The stringify method takes a value and an optional replacer, and an optional
+// space parameter, and returns a JSON text. The replacer can be a function
+// that can replace values, or an array of strings that will select the keys.
+// A default replacer method can be provided. Use of the space parameter can
+// produce text that is more easily readable.
+
+            var i;
+            gap = '';
+            indent = '';
+
+// If the space parameter is a number, make an indent string containing that
+// many spaces.
+
+            if (typeof space === 'number') {
+                for (i = 0; i < space; i += 1) {
+                    indent += ' ';
+                }
+
+// If the space parameter is a string, it will be used as the indent string.
+
+            } else if (typeof space === 'string') {
+                indent = space;
             }
-          } else if (schema.properties || schema.additionalProperties) {
-            errors.concat(checkObj(value, schema.properties, path, schema.additionalProperties));
-          }
-          if (_.isString(value)) {
-            if (schema.pattern && !value.match(schema.pattern)) {
-              addError('pattern');
+
+// If there is a replacer, it must be a function or an array.
+// Otherwise, throw an error.
+
+            rep = replacer;
+            if (replacer && typeof replacer !== 'function' &&
+                    (typeof replacer !== 'object' ||
+                    typeof replacer.length !== 'number')) {
+                throw new Error('JSON.stringify');
             }
-            if (schema.maxLength && value.length > schema.maxLength) {
-              addError('maxLength');
+
+// Make a fake root object containing our value under the key of ''.
+// Return the result of stringifying the value.
+
+            return str('', {'': value});
+        };
+    }
+
+
+// If the JSON object does not yet have a parse method, give it one.
+
+    if (typeof JSON.parse !== 'function') {
+        JSON.parse = function (text, reviver) {
+
+// The parse method takes a text and an optional reviver function, and returns
+// a JavaScript value if the text is a valid JSON text.
+
+            var j;
+
+            function walk(holder, key) {
+
+// The walk method is used to recursively walk the resulting structure so
+// that modifications can be made.
+
+                var k, v, value = holder[key];
+                if (value && typeof value === 'object') {
+                    for (k in value) {
+                        if (Object.prototype.hasOwnProperty.call(value, k)) {
+                            v = walk(value, k);
+                            if (v !== undefined) {
+                                value[k] = v;
+                            } else {
+                                delete value[k];
+                            }
+                        }
+                    }
+                }
+                return reviver.call(holder, key, value);
             }
-            if (schema.minLength && value.length < schema.minLength) {
-              addError('minLength');
-            }
-          }
-          if (schema.minimum !== void 0 && typeof value === typeof schema.minimum && schema.minimum > value) {
-            addError('minimum');
-          }
-          if (schema.maximum !== void 0 && typeof value === typeof schema.maximum && schema.maximum < value) {
-            addError('maximum');
-          }
-          if (schema["enum"]) {
-            enumeration = schema["enum"];
-            if (_.isFunction(enumeration)) {
-              if (enumeration.length === 2) {
-                asyncs.push({
-                  value: value,
-                  path: path,
-                  fetch: enumeration
+
+
+// Parsing happens in four stages. In the first stage, we replace certain
+// Unicode characters with escape sequences. JavaScript handles many characters
+// incorrectly, either silently deleting them, or treating them as line endings.
+
+            text = String(text);
+            cx.lastIndex = 0;
+            if (cx.test(text)) {
+                text = text.replace(cx, function (a) {
+                    return '\\u' +
+                        ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
                 });
-              } else if (enumeration.length === 1) {
-                if (!enumeration.call(self, value)) {
-                  addError('enum');
-                }
-              } else {
-                enumeration = enumeration.call(self);
-                if (!_.include(enumeration, value)) {
-                  addError('enum');
-                }
-              }
-            } else {
-              if (!_.include(enumeration, value)) {
-                addError('enum');
-              }
             }
-          }
-          if (_.isNumber(schema.maxDecimal) && (new RegExp("\\.[0-9]{" + (schema.maxDecimal + 1) + ",}")).test(value)) {
-            addError('digits');
-          }
-        }
-      }
-      return null;
-    };
-    checkObj = function(instance, objTypeDef, path, additionalProp) {
-      var i, propDef, requires, value, _ref, _ref2, _ref3;
-      if (objTypeDef == null) {
-        objTypeDef = {};
-      }
-      if (_.isObject(objTypeDef)) {
-        if (typeof instance !== 'object' || _.isArray(instance)) {
-          errors.push({
-            property: path,
-            message: 'type'
-          });
-        }
-        for (i in objTypeDef) {
-          if (!__hasProp.call(objTypeDef, i)) continue;
-          propDef = objTypeDef[i];
-          value = instance[i];
-          if ('value' in propDef && ((_ref = options.flavor) === 'add' || _ref === 'update')) {
-            value = instance[i] = propDef.value;
-          }
-          if (value === void 0 && options.existingOnly) {
-            continue;
-          }
-          if (options.veto && (propDef.veto === true || typeof propDef.veto === 'object' && propDef.veto[options.flavor])) {
-            delete instance[i];
-            continue;
-          }
-          if (((_ref2 = options.flavor) === 'query' || _ref2 === 'get') && !options.coerce) {
-            continue;
-          }
-          if (value === void 0 && (propDef["default"] != null) && options.flavor === 'add') {
-            value = instance[i] = propDef["default"];
-          }
-          if (value === void 0 && options.flavor !== 'add') {
-            delete instance[i];
-            continue;
-          }
-          if (options.coerce && propDef.type && i in instance && value !== void 0) {
-            value = coerce(value, propDef.type);
-            instance[i] = value;
-          }
-          if (value === void 0 && propDef.optional) {
-            delete instance[i];
-            continue;
-          }
-          checkProp(value, propDef, path, i);
-        }
-      }
-      for (i in instance) {
-        value = instance[i];
-        if (i in instance && !objTypeDef[i] && (additionalProp === false || options.removeAdditionalProps)) {
-          if (options.removeAdditionalProps) {
-            delete instance[i];
-            continue;
-          } else {
-            errors.push({
-              property: path,
-              message: 'unspecifed'
-            });
-          }
-        }
-        requires = (_ref3 = objTypeDef[i]) != null ? _ref3.requires : void 0;
-        if (requires && !requires in instance) {
-          errors.push({
-            property: path,
-            message: 'requires'
-          });
-        }
-        if ((additionalProp != null ? additionalProp.type : void 0) && !objTypeDef[i]) {
-          if (options.coerce && additionalProp.type) {
-            value = coerce(value, additionalProp.type);
-            instance[i] = value;
-            checkProp(value, additionalProp, path, i);
-          }
-        }
-        if (!_changing && (value != null ? value.$schema : void 0)) {
-          errors = errors.concat(checkProp(value, value.$schema, path, i));
-        }
-      }
-      return errors;
-    };
-    if (schema) {
-      checkProp(instance, schema, '', _changing || '');
+
+// In the second stage, we run the text against regular expressions that look
+// for non-JSON patterns. We are especially concerned with '()' and 'new'
+// because they can cause invocation, and '=' because it can cause mutation.
+// But just to be safe, we want to reject all unexpected forms.
+
+// We split the second stage into 4 regexp operations in order to work around
+// crippling inefficiencies in IE's and Safari's regexp engines. First we
+// replace the JSON backslash pairs with '@' (a non-JSON character). Second, we
+// replace all simple value tokens with ']' characters. Third, we delete all
+// open brackets that follow a colon or comma or that begin the text. Finally,
+// we look to see that the remaining characters are only whitespace or ']' or
+// ',' or ':' or '{' or '}'. If that is so, then the text is safe for eval.
+
+            if (/^[\],:{}\s]*$/
+                    .test(text.replace(/\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g, '@')
+                        .replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, ']')
+                        .replace(/(?:^|:|,)(?:\s*\[)+/g, ''))) {
+
+// In the third stage we use the eval function to compile the text into a
+// JavaScript structure. The '{' operator is subject to a syntactic ambiguity
+// in JavaScript: it can begin a block or an object literal. We wrap the text
+// in parens to eliminate the ambiguity.
+
+                j = eval('(' + text + ')');
+
+// In the optional fourth stage, we recursively walk the new structure, passing
+// each name/value pair to a reviver function for possible transformation.
+
+                return typeof reviver === 'function' ?
+                    walk({'': j}, '') : j;
+            }
+
+// If the text is not JSON parseable, then a SyntaxError is thrown.
+
+            throw new SyntaxError('JSON.parse');
+        };
     }
-    if (!_changing && (instance != null ? instance.$schema : void 0)) {
-      checkProp(instance, instance.$schema, '', '');
-    }
-    len = asyncs.length;
-    if (callback && len) {
-      _fn = function(async) {
-        return async.fetch.call(self, async.value, function(err) {
-          if (err) {
-            errors.push({
-              property: async.path,
-              message: 'enum'
-            });
-          }
-          len -= 1;
-          if (!len) {
-            return callback(errors.length && errors || null, instance);
-          }
-        });
-      };
-      for (i = 0, _len = asyncs.length; i < _len; i++) {
-        async = asyncs[i];
-        _fn(async);
-      }
-    } else if (callback) {
-      callback(errors.length && errors || null, instance);
-    } else {
-      return errors.length && errors || null;
-    }
-  };
-  _.mixin({
-    coerce: coerce,
-    validate: validate
-  });
-}).call(this);
- $.ender(module.exports); }();
+}());
+
+// shim IE<8 and FF with buggy stringifier
+if (!this.JSON || !~this.JSON.stringify({date:new Date(2011,4,6,10,10)},function(k,v){if(k==='date')return String('SERIALIZED');return v;}).indexOf('SERIALIZED')) {
+  this.JSON = JSON;
+}
+}();
 /**
   * Klass.js - copyright @dedfat
   * version 1.0
@@ -2212,11 +1498,11 @@
 !function(win, doc, timeout) {
   var script = doc.getElementsByTagName("script")[0],
       list = {}, ids = {}, delay = {}, re = /^i|c/,
-      scripts = {}, s = 'string', f = false, i,
+      scripts = {}, s = 'string', f = false,
       push = 'push', domContentLoaded = 'DOMContentLoaded', readyState = 'readyState',
       addEventListener = 'addEventListener', onreadystatechange = 'onreadystatechange',
       every = function(ar, fn) {
-        for (i = 0, j = ar.length; i < j; ++i) {
+        for (var i = 0, j = ar.length; i < j; ++i) {
           if (!fn(ar[i])) {
             return 0;
           }
@@ -2315,7 +1601,8 @@
     (module.exports = $script) :
     (win.$script = $script);
 
-}(this, document, setTimeout);!function () {
+}(this, document, setTimeout);
+!function () {
   var s = $script.noConflict();
   $.ender({
     script: s,
@@ -2494,7 +1781,7 @@
     if (isNode(selector)) {
       return !_root || (isNode(root) && isAncestor(selector, root)) ? [selector] : [];
     }
-    if (selector && typeof selector === 'object' && selector.length && isFinite(selector.length)) {
+    if (selector && typeof selector === 'object' && isFinite(selector.length)) {
       return array(selector);
     }
     if (m = selector.match(idOnly)) {
@@ -2512,7 +1799,7 @@
 
   function qsa(selector, _root) {
     var root = (typeof _root == 'string') ? qsa(_root)[0] : (_root || doc);
-    if (!root) {
+    if (!root || !selector) {
       return [];
     }
     if (m = boilerPlate(selector, _root, qsa)) {
@@ -2545,7 +1832,7 @@
     }
     return function (selector, _root) {
       var root = (typeof _root == 'string') ? qwery(_root)[0] : (_root || doc);
-      if (!root) {
+      if (!root || !selector) {
         return [];
       }
       var i, l, result = [], collections = [], element;
@@ -2624,27 +1911,41 @@
   */
 !function (context) {
 
-  var doc = document,
+  var doc = context.document,
       html = doc.documentElement,
+      query = null,
+      byTag = 'getElementsByTagName',
       specialAttributes = /^checked|value|selected$/,
       stateAttributes = /^checked|selected$/,
-      ie = /msie/.test(navigator.userAgent),
+      ie = /msie/i.test(navigator.userAgent),
       uidList = [],
-      uuids = 0;
+      uuids = 0,
+      digit = /^-?\d+$/,
+      px = 'px',
+      // commonly used methods
+      setAttribute = 'setAttribute',
+      getAttribute = 'getAttribute',
+      trimReplace = /(^\s*|\s*$)/g,
+      unitless = { lineHeight: 1, zoom: 1, zIndex: 1, opacity: 1 };
 
   function classReg(c) {
     return new RegExp("(^|\\s+)" + c + "(\\s+|$)");
   }
 
-  function each(ar, fn) {
-    for (i = 0, len = ar.length; i < len; i++) {
-      fn(ar[i]);
+  function each(ar, fn, scope) {
+    for (var i = 0, l = ar.length; i < l; i++) {
+      fn.call(scope || ar[i], ar[i], i, ar);
     }
+    return ar;
   }
 
-  function trim(s) {
-    return s.replace(/(^\s*|\s*$)/g, '');
-  }
+  var trim = String.prototype.trim ?
+    function (s) {
+      return s.trim();
+    } :
+    function (s) {
+      return s.replace(trimReplace, '');
+    };
 
   function camelize(s) {
     return s.replace(/-(.)/g, function (m, m1) {
@@ -2665,38 +1966,99 @@
     return false;
   }
 
-  function sucks(o) {
-    for (var k in o) {
-      switch (k) {
-      case 'opacity':
-        o.filter = 'alpha(opacity=' + (o[k] * 100) + ')';
-        delete o[k];
-        break;
-      case '':
-        break;
+  var getStyle = doc.defaultView && doc.defaultView.getComputedStyle ?
+    function (el, property) {
+      var value = null;
+      if (property == 'float') {
+        property = 'cssFloat';
       }
+      var computed = doc.defaultView.getComputedStyle(el, '');
+      computed && (value = computed[camelize(property)]);
+      return el.style[property] || value;
+
+    } : (ie && html.currentStyle) ?
+
+    function (el, property) {
+      property = camelize(property);
+      property = property == 'float' ? 'styleFloat' : property;
+
+      if (property == 'opacity') {
+        var val = 100;
+        try {
+          val = el.filters['DXImageTransform.Microsoft.Alpha'].opacity;
+        } catch (e1) {
+          try {
+            val = el.filters('alpha').opacity;
+          } catch (e2) {}
+        }
+        return val / 100;
+      }
+      var value = el.currentStyle ? el.currentStyle[property] : null;
+      return el.style[property] || value;
+    } :
+
+    function (el, property) {
+      return el.style[camelize(property)];
+    };
+
+  function insert(target, host, fn) {
+    var i = 0, self = host || this, r = [];
+    each(normalize(query ? query(target) : target), function (t) {
+      each(self, function (el) {
+        var n = el.cloneNode(true);
+        fn(t, n);
+        r[i] = n;
+        i++;
+      });
+    }, this);
+    each(r, function (e, i) {
+      self[i] = e;
+    });
+    self.length = i;
+    return self;
+  }
+
+  function xy(el, x, y) {
+    var $el = bonzo(el),
+        style = $el.css('position'),
+        offset = $el.offset(),
+        rel = 'relative',
+        isRel = style == rel,
+        delta = [parseInt($el.css('left'), 10), parseInt($el.css('top'), 10)];
+
+    if (style == 'static') {
+      $el.css('position', rel);
+      style = rel;
     }
+
+    isNaN(delta[0]) && (delta[0] = isRel ? 0 : el.offsetLeft);
+    isNaN(delta[1]) && (delta[1] = isRel ? 0 : el.offsetTop);
+
+    x !== null && (el.style.left = x - offset.left + delta[0] + 'px');
+    y !== null && (el.style.top = y - offset.top + delta[1] + 'px');
+
   }
 
   function _bonzo(elements) {
-    this.elements = [];
     this.length = 0;
+    this.original = elements;
     if (elements) {
-      this.elements = typeof elements !== 'string' && !elements.nodeType && typeof elements.length !== 'undefined' ? elements : [elements];
-      this.length = this.elements.length;
-      for (var i = 0; i < this.length; i++) {
-        this[i] = this.elements[i];
+      elements = typeof elements !== 'string' &&
+        !elements.nodeType &&
+        typeof elements.length !== 'undefined' ?
+          elements :
+          [elements];
+      this.length = elements.length;
+      for (var i = 0; i < elements.length; i++) {
+        this[i] = elements[i];
       }
     }
   }
 
   _bonzo.prototype = {
 
-    each: function (fn) {
-      for (var i = 0, l = this.length; i < l; i++) {
-        fn.call(this, this[i], i);
-      }
-      return this;
+    each: function (fn, scope) {
+      return each(this, fn, scope);
     },
 
     map: function (fn, reject) {
@@ -2716,29 +2078,38 @@
       return bonzo(this[this.length - 1]);
     },
 
-    html: function (html) {
-      return typeof html !== 'undefined' ?
+    html: function (h, text) {
+      var method = text ?
+        html.textContent == null ?
+          'innerText' :
+          'textContent' :
+        'innerHTML';
+      return typeof h !== 'undefined' ?
         this.each(function (el) {
-          el.innerHTML = html;
+          el[method] = h;
         }) :
-        this.elements[0] ? this.elements[0].innerHTML : '';
+        this[0] ? this[0][method] : '';
+    },
+
+    text: function (text) {
+      return this.html(text, 1);
     },
 
     addClass: function (c) {
       return this.each(function (el) {
         this.hasClass(el, c) || (el.className = trim(el.className + ' ' + c));
-      });
+      }, this);
     },
 
     removeClass: function (c) {
       return this.each(function (el) {
         this.hasClass(el, c) && (el.className = trim(el.className.replace(classReg(c), ' ')));
-      });
+      }, this);
     },
 
     hasClass: function (el, c) {
       return typeof c == 'undefined' ?
-        some(this.elements, function (i) {
+        some(this, function (i) {
           return classReg(el).test(i.className);
         }) :
         classReg(c).test(el.className);
@@ -2752,7 +2123,7 @@
         this.hasClass(el, c) ?
           (el.className = trim(el.className.replace(classReg(c), ' '))) :
           (el.className = trim(el.className + ' ' + c));
-      });
+      }, this);
     },
 
     show: function (elements) {
@@ -2784,9 +2155,15 @@
       });
     },
 
-    appendTo: function (target) {
-      return this.each(function (el) {
-        target.appendChild(el);
+    appendTo: function (target, host) {
+      return insert.call(this, target, host, function (t, el) {
+        t.appendChild(el);
+      });
+    },
+
+    prependTo: function (target, host) {
+      return insert.call(this, target, host, function (t, el) {
+        t.insertBefore(el, t.firstChild);
       });
     },
 
@@ -2813,32 +2190,10 @@
       );
     },
 
-    prependTo: function (target) {
-      return this.each(function (el) {
-        target.insertBefore(el, bonzo.firstChild(target));
-      });
-    },
-
     before: function (node) {
       return this.each(function (el) {
         each(bonzo.create(node), function (i) {
           el.parentNode.insertBefore(i, el);
-        });
-      });
-    },
-
-    insertBefore: function (node) {
-      return this.each(function (el) {
-        each(normalize(node), function (n) {
-          n.parentNode.insertBefore(el, n);
-        });
-      });
-    },
-
-    insertAfter: function (node) {
-      return this.each(function (el) {
-        each(normalize(node), function (n) {
-          n.parentNode.insertBefore(el, (n.nextSibling || n));
         });
       });
     },
@@ -2851,26 +2206,63 @@
       });
     },
 
+    insertBefore: function (target, host) {
+      return insert.call(this, target, host, function (t, el) {
+        t.parentNode.insertBefore(el, t);
+      });
+    },
+
+    insertAfter: function (target, host) {
+      return insert.call(this, target, host, function (t, el) {
+        t.parentNode.insertBefore(el, (t.nextSibling || t));
+      });
+    },
+
     css: function (o, v) {
+      // is this a request for just getting a style?
       if (v === undefined && typeof o == 'string') {
-        return this[0].style[camelize(o)];
+        return getStyle(this[0], o);
       }
       var iter = o;
       if (typeof o == 'string') {
         iter = {};
         iter[o] = v;
       }
-      ie && sucks(iter);
-      var fn = function (el) {
+
+      if (ie && iter.opacity) {
+        // oh this 'ol gamut
+        iter.filter = 'alpha(opacity=' + (iter.opacity * 100) + ')';
+        // give it layout
+        iter.zoom = o.zoom || 1;
+        delete iter.opacity;
+      }
+
+      if (v = iter['float']) {
+        // float is a reserved style word. w3 uses cssFloat, ie uses styleFloat
+        ie ? (iter.styleFloat = v) : (iter.cssFloat = v);
+        delete iter['float'];
+      }
+
+      var fn = function (el, p, v) {
         for (var k in iter) {
-          iter.hasOwnProperty(k) && (el.style[camelize(k)] = iter[k]);
+          if (iter.hasOwnProperty(k)) {
+            v = iter[k];
+            // change "5" to "5px" - unless you're line-height, which is allowed
+            (p = camelize(k)) && digit.test(v) && !(p in unitless) && (v += px);
+            el.style[p] = v;
+          }
         }
       };
       return this.each(fn);
     },
 
-    offset: function () {
-      var el = this.elements[0];
+    offset: function (x, y) {
+      if (x || y) {
+        return this.each(function (el) {
+          xy(el, x, y);
+        });
+      }
+      var el = this[0];
       var width = el.offsetWidth;
       var height = el.offsetHeight;
       var top = el.offsetTop;
@@ -2889,13 +2281,13 @@
     },
 
     attr: function (k, v) {
-      var el = this.elements[0];
+      var el = this[0];
       return typeof v == 'undefined' ?
         specialAttributes.test(k) ?
           stateAttributes.test(k) && typeof el[k] == 'string' ?
-            true : el[k] : el.getAttribute(k) :
+            true : el[k] : el[getAttribute](k) :
         this.each(function (el) {
-          el.setAttribute(k, v);
+          el[setAttribute](k, v);
         });
     },
 
@@ -2910,16 +2302,16 @@
     },
 
     data: function (k, v) {
-      var el = this.elements[0];
+      var el = this[0];
       if (typeof v === 'undefined') {
-        el.getAttribute('data-node-uid') || el.setAttribute('data-node-uid', ++uuids);
-        var uid = el.getAttribute('data-node-uid');
+        el[getAttribute]('data-node-uid') || el[setAttribute]('data-node-uid', ++uuids);
+        var uid = el[getAttribute]('data-node-uid');
         uidList[uid] || (uidList[uid] = {});
         return uidList[uid][k];
       } else {
         return this.each(function (el) {
-          el.getAttribute('data-node-uid') || el.setAttribute('data-node-uid', ++uuids);
-          var uid = el.getAttribute('data-node-uid');
+          el[getAttribute]('data-node-uid') || el[setAttribute]('data-node-uid', ++uuids);
+          var uid = el[getAttribute]('data-node-uid');
           var o = {};
           o[k] = v;
           uidList[uid] = o;
@@ -2957,9 +2349,9 @@
 
     serialize: function () {
       var form = this[0],
-          inputs = form.getElementsByTagName('input'),
-          selects = form.getElementsByTagName('select'),
-          texts = form.getElementsByTagName('textarea');
+          inputs = form[byTag]('input'),
+          selects = form[byTag]('select'),
+          texts = form[byTag]('textarea');
       return (bonzo(inputs).map(serial).join('') +
       bonzo(selects).map(serial).join('') +
       bonzo(texts).map(serial).join('')).replace(/&$/, '');
@@ -3013,7 +2405,7 @@
   }
 
   function scroll(x, y, type) {
-    var el = this.elements[0];
+    var el = this[0];
     if (x == null && y == null) {
       return (isBody(el) ? getWindowScroll() : { x: el.scrollLeft, y: el.scrollTop })[type];
     }
@@ -3034,9 +2426,14 @@
     return { x: window.pageXOffset || html.scrollLeft, y: window.pageYOffset || html.scrollTop };
   }
 
-  function bonzo(els) {
-    return new _bonzo(els);
+  function bonzo(els, host) {
+    return new _bonzo(els, host);
   }
+
+  bonzo.setQueryEngine = function (q) {
+    query = q;
+    delete bonzo.setQueryEngine;
+  };
 
   bonzo.aug = function (o, target) {
     for (var k in o) {
@@ -3112,8 +2509,10 @@
   };
   context.bonzo = bonzo;
 
-}(this);!function () {
+}(this);!function ($) {
+
   var b = bonzo.noConflict();
+  b.setQueryEngine($);
   $.ender(b);
   $.ender(b(), true);
   $.ender({
@@ -3124,7 +2523,7 @@
 
   function indexOf(ar, val) {
     for (var i = 0; i < ar.length; i++) {
-      if ( ar[i] === val ) {
+      if (ar[i] === val) {
         return i;
       }
     }
@@ -3179,6 +2578,22 @@
       return $(b(this).previous());
     },
 
+    appendTo: function (t) {
+      return b(this.selector).appendTo(t, this);
+    },
+
+    prependTo: function (t) {
+      return b(this.selector).prependTo(t, this);
+    },
+
+    insertAfter: function (t) {
+      return b(this.selector).insertAfter(t, this);
+    },
+
+    insertBefore: function (t) {
+      return b(this.selector).insertBefore(t, this);
+    },
+
     siblings: function () {
       var i, l, p, r = [];
       for (i = 0, l = this.length; i < l; i++) {
@@ -3191,12 +2606,412 @@
           p.nodeType == 1 && r.push(p);
         }
       }
+      return $(r);
+    },
+
+    children: function () {
+      var el, r = [];
+      for (i = 0, l = this.length; i < l; i++) {
+        if (!(el = b.firstChild(this[i]))) {
+          continue;
+        }
+        r.push(el);
+        while (el = el.nextSibling) {
+          el.nodeType == 1 && r.push(el);
+        }
+      }
       return $(uniq(r));
+    },
+
+    height: function (v) {
+      return v ? this.css('height', v) : parseInt(this.css('height'), 10);
+    },
+
+    width: function (v) {
+      return v ? this.css('width', v) : parseInt(this.css('width'), 10);
     }
   }, true);
 
-}();
+}(ender || $);
 
+/*!
+  * bean.js - copyright @dedfat
+  * https://github.com/fat/bean
+  * Follow our software http://twitter.com/dedfat
+  * MIT License
+  * special thanks to:
+  * dean edwards: http://dean.edwards.name/
+  * dperini: https://github.com/dperini/nwevents
+  * the entire mootools team: github.com/mootools/mootools-core
+  */
+!function (context) {
+  var __uid = 1, registry = {}, collected = {},
+      overOut = /over|out/,
+      namespace = /[^\.]*(?=\..*)\.|.*/,
+      stripName = /\..*/,
+      addEvent = 'addEventListener',
+      attachEvent = 'attachEvent',
+      removeEvent = 'removeEventListener',
+      detachEvent = 'detachEvent',
+      doc = context.document || {},
+      root = doc.documentElement || {},
+      W3C_MODEL = root[addEvent],
+      eventSupport = W3C_MODEL ? addEvent : attachEvent,
+
+  isDescendant = function (parent, child) {
+    var node = child.parentNode;
+    while (node != null) {
+      if (node == parent) {
+        return true;
+      }
+      node = node.parentNode;
+    }
+  },
+
+  retrieveUid = function (obj, uid) {
+    return (obj.__uid = uid || obj.__uid || __uid++);
+  },
+
+  retrieveEvents = function (element) {
+    var uid = retrieveUid(element);
+    return (registry[uid] = registry[uid] || {});
+  },
+
+  listener = W3C_MODEL ? function (element, type, fn, add) {
+    element[add ? addEvent : removeEvent](type, fn, false);
+  } : function (element, type, fn, add, custom) {
+    custom && add && (element['_on' + custom] = element['_on' + custom] || 0);
+    element[add ? attachEvent : detachEvent]('on' + type, fn);
+  },
+
+  nativeHandler = function (element, fn, args) {
+    return function (event) {
+      event = fixEvent(event || ((this.ownerDocument || this.document || this).parentWindow || context).event);
+      return fn.apply(element, [event].concat(args));
+    };
+  },
+
+  customHandler = function (element, fn, type, condition, args) {
+    return function (event) {
+      if (condition ? condition.call(this, event) : W3C_MODEL ? true : event && event.propertyName == '_on' + type || !event) {
+        fn.apply(element, [event].concat(args));
+      }
+    };
+  },
+
+  addListener = function (element, orgType, fn, args) {
+    var type = orgType.replace(stripName, ''),
+        events = retrieveEvents(element),
+        handlers = events[type] || (events[type] = {}),
+        uid = retrieveUid(fn, orgType.replace(namespace, ''));
+    if (handlers[uid]) {
+      return element;
+    }
+    var custom = customEvents[type];
+    if (custom) {
+      fn = custom.condition ? customHandler(element, fn, type, custom.condition) : fn;
+      type = custom.base || type;
+    }
+    var isNative = nativeEvents[type];
+    fn = isNative ? nativeHandler(element, fn, args) : customHandler(element, fn, type, false, args);
+    isNative = W3C_MODEL || isNative;
+    if (type == 'unload') {
+      var org = fn;
+      fn = function () {
+        removeListener(element, type, fn) && org();
+      };
+    }
+    element[eventSupport] && listener(element, isNative ? type : 'propertychange', fn, true, !isNative && type);
+    handlers[uid] = fn;
+    fn.__uid = uid;
+    return type == 'unload' ? element : (collected[retrieveUid(element)] = element);
+  },
+
+  removeListener = function (element, orgType, handler) {
+    var uid, names, uids, i, events = retrieveEvents(element), type = orgType.replace(stripName, '');
+    if (!events || !events[type]) {
+      return element;
+    }
+    names = orgType.replace(namespace, '');
+    uids = names ? names.split('.') : [handler.__uid];
+    for (i = uids.length; i--;) {
+      uid = uids[i];
+      handler = events[type][uid];
+      delete events[type][uid];
+      if (element[eventSupport]) {
+        type = customEvents[type] ? customEvents[type].base : type;
+        var isNative = W3C_MODEL || nativeEvents[type];
+        listener(element, isNative ? type : 'propertychange', handler, false, !isNative && type);
+      }
+    }
+    return element;
+  },
+
+  del = function (selector, fn, $) {
+    return function (e) {
+      var array = typeof selector == 'string' ? $(selector, this) : selector;
+      for (var target = e.target; target && target != this; target = target.parentNode) {
+        for (var i = array.length; i--;) {
+          if (array[i] == target) {
+            return fn.apply(target, arguments);
+          }
+        }
+      }
+    };
+  },
+
+  add = function (element, events, fn, delfn, $) {
+    if (typeof events == 'object' && !fn) {
+      for (var type in events) {
+        events.hasOwnProperty(type) && add(element, type, events[type]);
+      }
+    } else {
+      var isDel = typeof fn == 'string', types = (isDel ? fn : events).split(' ');
+      fn = isDel ? del(events, delfn, $) : fn;
+      for (var i = types.length; i--;) {
+        addListener(element, types[i], fn, Array.prototype.slice.call(arguments, isDel ? 4 : 3));
+      }
+    }
+    return element;
+  },
+
+  remove = function (element, orgEvents, fn) {
+    var k, type, events,
+        isString = typeof(orgEvents) == 'string',
+        names = isString && orgEvents.replace(namespace, ''),
+        rm = removeListener,
+        attached = retrieveEvents(element);
+    if (isString && /\s/.test(orgEvents)) {
+      orgEvents = orgEvents.split(' ');
+      var i = orgEvents.length - 1;
+      while (remove(element, orgEvents[i]) && i--) {}
+      return element;
+    }
+    events = isString ? orgEvents.replace(stripName, '') : orgEvents;
+    if (!attached || (isString && !attached[events])) {
+      return element;
+    }
+    if (typeof fn == 'function') {
+      rm(element, events, fn);
+    } else if (names) {
+      rm(element, orgEvents);
+    } else {
+      rm = events ? rm : remove;
+      type = isString && events;
+      events = events ? (fn || attached[events] || events) : attached;
+      for (k in events) {
+        events.hasOwnProperty(k) && rm(element, type || k, events[k]);
+      }
+    }
+    return element;
+  },
+
+  fire = function (element, type, args) {
+    var evt, k, i, types = type.split(' ');
+    for (i = types.length; i--;) {
+      type = types[i].replace(stripName, '');
+      var isNative = nativeEvents[type],
+          isNamespace = types[i].replace(namespace, ''),
+          handlers = retrieveEvents(element)[type];
+      if (isNamespace) {
+        isNamespace = isNamespace.split('.');
+        for (k = isNamespace.length; k--;) {
+          handlers[isNamespace[k]] && handlers[isNamespace[k]].apply(element, args);
+        }
+      } else if (!args && element[eventSupport]) {
+        fireListener(isNative, type, element);
+      } else {
+        for (k in handlers) {
+          handlers.hasOwnProperty(k) && handlers[k].apply(element, args);
+        }
+      }
+    }
+    return element;
+  },
+
+  fireListener = W3C_MODEL ? function (isNative, type, element) {
+    evt = document.createEvent(isNative ? "HTMLEvents" : "UIEvents");
+    evt[isNative ? 'initEvent' : 'initUIEvent'](type, true, true, context, 1);
+    element.dispatchEvent(evt);
+  } : function (isNative, type, element) {
+    isNative ? element.fireEvent('on' + type, document.createEventObject()) : element['_on' + type]++;
+  },
+
+  clone = function (element, from, type) {
+    var events = retrieveEvents(from), obj, k;
+    obj = type ? events[type] : events;
+    for (k in obj) {
+      obj.hasOwnProperty(k) && (type ? add : clone)(element, type || from, type ? obj[k] : k);
+    }
+    return element;
+  },
+
+  fixEvent = function (e) {
+    var result = {};
+    if (!e) {
+      return result;
+    }
+    var type = e.type, target = e.target || e.srcElement;
+    result.preventDefault = fixEvent.preventDefault(e);
+    result.stopPropagation = fixEvent.stopPropagation(e);
+    result.target = target && target.nodeType == 3 ? target.parentNode : target;
+    if (~type.indexOf('key')) {
+      result.keyCode = e.which || e.keyCode;
+    } else if ((/click|mouse|menu/i).test(type)) {
+      result.rightClick = e.which == 3 || e.button == 2;
+      result.pos = { x: 0, y: 0 };
+      if (e.pageX || e.pageY) {
+        result.clientX = e.pageX;
+        result.clientY = e.pageY;
+      } else if (e.clientX || e.clientY) {
+        result.clientX = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
+        result.clientY = e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
+      }
+      overOut.test(type) && (result.relatedTarget = e.relatedTarget || e[(type == 'mouseover' ? 'from' : 'to') + 'Element']);
+    }
+    for (var k in e) {
+      if (!(k in result)) {
+        result[k] = e[k];
+      }
+    }
+    return result;
+  };
+
+  fixEvent.preventDefault = function (e) {
+    return function () {
+      if (e.preventDefault) {
+        e.preventDefault();
+      }
+      else {
+        e.returnValue = false;
+      }
+    };
+  };
+
+  fixEvent.stopPropagation = function (e) {
+    return function () {
+      if (e.stopPropagation) {
+        e.stopPropagation();
+      } else {
+        e.cancelBubble = true;
+      }
+    };
+  };
+
+  var nativeEvents = { click: 1, dblclick: 1, mouseup: 1, mousedown: 1, contextmenu: 1, //mouse buttons
+    mousewheel: 1, DOMMouseScroll: 1, //mouse wheel
+    mouseover: 1, mouseout: 1, mousemove: 1, selectstart: 1, selectend: 1, //mouse movement
+    keydown: 1, keypress: 1, keyup: 1, //keyboard
+    orientationchange: 1, // mobile
+    touchstart: 1, touchmove: 1, touchend: 1, touchcancel: 1, // touch
+    gesturestart: 1, gesturechange: 1, gestureend: 1, // gesture
+    focus: 1, blur: 1, change: 1, reset: 1, select: 1, submit: 1, //form elements
+    load: 1, unload: 1, beforeunload: 1, resize: 1, move: 1, DOMContentLoaded: 1, readystatechange: 1, //window
+    error: 1, abort: 1, scroll: 1 }; //misc
+
+  function check(event) {
+    var related = event.relatedTarget;
+    if (!related) {
+      return related == null;
+    }
+    return (related != this && related.prefix != 'xul' && !/document/.test(this.toString()) && !isDescendant(this, related));
+  }
+
+  var customEvents = {
+    mouseenter: { base: 'mouseover', condition: check },
+    mouseleave: { base: 'mouseout', condition: check },
+    mousewheel: { base: /Firefox/.test(navigator.userAgent) ? 'DOMMouseScroll' : 'mousewheel' }
+  };
+
+  var bean = { add: add, remove: remove, clone: clone, fire: fire };
+
+  var clean = function (el) {
+    var uid = remove(el).__uid;
+    if (uid) {
+      delete collected[uid];
+      delete registry[uid];
+    }
+  };
+
+  if (context[attachEvent]) {
+    add(context, 'unload', function () {
+      for (var k in collected) {
+        collected.hasOwnProperty(k) && clean(collected[k]);
+      }
+      context.CollectGarbage && CollectGarbage();
+    });
+  }
+
+  var oldBean = context.bean;
+  bean.noConflict = function () {
+    context.bean = oldBean;
+    return this;
+  };
+
+  (typeof module !== 'undefined' && module.exports) ?
+    (module.exports = bean) :
+    (context.bean = bean);
+
+}(this);!function () {
+  var b = bean.noConflict(),
+      integrate = function (method, type, method2) {
+        var _args = type ? [type] : [];
+        return function () {
+          for (var args, i = 0, l = this.length; i < l; i++) {
+            args = [this[i]].concat(_args, Array.prototype.slice.call(arguments, 0));
+            args.length == 4 && args.push($);
+            !arguments.length && method == 'add' && type && (method = 'fire');
+            b[method].apply(this, args);
+          }
+          return this;
+        };
+      };
+
+  var add = integrate('add'),
+      remove = integrate('remove'),
+      fire = integrate('fire');
+
+  var methods = {
+
+    on: add,
+    addListener: add,
+    bind: add,
+    listen: add,
+    delegate: add,
+
+    unbind: remove,
+    unlisten: remove,
+    removeListener: remove,
+    undelegate: remove,
+
+    emit: fire,
+    trigger: fire,
+
+    cloneEvents: integrate('clone'),
+
+    hover: function (enter, leave) {
+      for (var i = 0, l = this.length; i < l; i++) {
+        b.add.call(this, this[i], 'mouseenter', enter);
+        b.add.call(this, this[i], 'mouseleave', leave);
+      }
+      return this;
+    }
+  };
+
+  var shortcuts = [
+    'blur', 'change', 'click', 'dblclick', 'error', 'focus', 'focusin',
+    'focusout', 'keydown', 'keypress', 'keyup', 'load', 'mousedown',
+    'mouseenter', 'mouseleave', 'mouseout', 'mouseover', 'mouseup',
+    'resize', 'scroll', 'select', 'submit', 'unload'
+  ];
+
+  for (var i = shortcuts.length; i--;) {
+    var shortcut = shortcuts[i];
+    methods[shortcut] = integrate('add', shortcut);
+  }
+
+  $.ender(methods, true);
+}();
 /*!
   * Reqwest! A x-browser general purpose XHR connection manager
   * copyright Dustin Diaz 2011
@@ -3339,383 +3154,6 @@
 }(this);$.ender({
   ajax: reqwest.noConflict()
 });
-/*!
-  * bean.js - copyright @dedfat
-  * https://github.com/fat/bean
-  * Follow our software http://twitter.com/dedfat
-  * MIT License
-  * special thanks to:
-  * dean edwards: http://dean.edwards.name/
-  * dperini: https://github.com/dperini/nwevents
-  * the entire mootools team: github.com/mootools/mootools-core
-  */
-!function (context) {
-  var __uid = 1, registry = {}, collected = {},
-      overOut = /over|out/,
-      namespace = /[^\.]*(?=\..*)\.|.*/,
-      stripName = /\..*/,
-      addEvent = 'addEventListener',
-      attachEvent = 'attachEvent',
-      removeEvent = 'removeEventListener',
-      detachEvent = 'detachEvent',
-      doc = context.document || {},
-      root = doc.documentElement || {},
-      W3C_MODEL = root[addEvent],
-      eventSupport = W3C_MODEL ? addEvent : attachEvent,
-
-  isDescendant = function (parent, child) {
-    var node = child.parentNode;
-    while (node != null) {
-      if (node == parent) {
-        return true;
-      }
-      node = node.parentNode;
-    }
-  },
-
-  retrieveUid = function (obj, uid) {
-    return (obj.__uid = uid || obj.__uid || __uid++);
-  },
-
-  retrieveEvents = function (element) {
-    var uid = retrieveUid(element);
-    return (registry[uid] = registry[uid] || {});
-  },
-
-  listener = W3C_MODEL ? function (element, type, fn, add) {
-    element[add ? addEvent : removeEvent](type, fn, false);
-  } : function (element, type, fn, add, custom) {
-    custom && add && (element['_on' + custom] = element['_on' + custom] || 0);
-    element[add ? attachEvent : detachEvent]('on' + type, fn);
-  },
-
-  nativeHandler = function (element, fn, args) {
-    return function (event) {
-      event = fixEvent(event || ((this.ownerDocument || this.document || this).parentWindow || context).event);
-      return fn.apply(element, [event].concat(args));
-    };
-  },
-
-  customHandler = function (element, fn, type, condition, args) {
-    return function (event) {
-      if (condition ? condition.call(this, event) : event && event.propertyName == '_on' + type || !event) {
-        fn.apply(element, [event].concat(args));
-      }
-    };
-  },
-
-  addListener = function (element, orgType, fn, args) {
-    var type = orgType.replace(stripName, ''),
-        events = retrieveEvents(element),
-        handlers = events[type] || (events[type] = {}),
-        uid = retrieveUid(fn, orgType.replace(namespace, ''));
-    if (handlers[uid]) {
-      return element;
-    }
-    var custom = customEvents[type];
-    if (custom) {
-      fn = custom.condition ? customHandler(element, fn, type, custom.condition) : fn;
-      type = custom.base || type;
-    }
-    var isNative = W3C_MODEL || nativeEvents.indexOf(type) > -1;
-    fn = isNative ? nativeHandler(element, fn, args) : customHandler(element, fn, type, false, args);
-    if (type == 'unload') {
-      var org = fn;
-      fn = function () {
-        removeListener(element, type, fn) && org();
-      };
-    }
-    element[eventSupport] && listener(element, isNative ? type : 'propertychange', fn, true, !isNative && type);
-    handlers[uid] = fn;
-    fn.__uid = uid;
-    return type == 'unload' ? element : (collected[retrieveUid(element)] = element);
-  },
-
-  removeListener = function (element, orgType, handler) {
-    var uid, names, uids, i, events = retrieveEvents(element), type = orgType.replace(stripName, '');
-    if (!events || !events[type]) {
-      return element;
-    }
-    names = orgType.replace(namespace, '');
-    uids = names ? names.split('.') : [handler.__uid];
-    for (i = uids.length; i--;) {
-      uid = uids[i];
-      handler = events[type][uid];
-      delete events[type][uid];
-      if (element[eventSupport]) {
-        type = customEvents[type] ? customEvents[type].base : type;
-        var isNative = element[addEvent] || nativeEvents.indexOf(type) > -1;
-        listener(element, isNative ? type : 'propertychange', handler, false, !isNative && type);
-      }
-    }
-    return element;
-  },
-
-  del = function (selector, fn, $) {
-    return function (e) {
-      var array = typeof selector == 'string' ? $(selector, this) : selector;
-      for (var target = e.target; target && target != this; target = target.parentNode) {
-        for (var i = array.length; i--;) {
-          if (array[i] == target) {
-            return fn.apply(target, arguments);
-          }
-        }
-      }
-    };
-  },
-
-  add = function (element, events, fn, delfn, $) {
-    if (typeof events == 'object' && !fn) {
-      for (var type in events) {
-        events.hasOwnProperty(type) && add(element, type, events[type]);
-      }
-    } else {
-      var isDel = typeof fn == 'string', types = (isDel ? fn : events).split(' ');
-      fn = isDel ? del(events, delfn, $) : fn;
-      for (var i = types.length; i--;) {
-        addListener(element, types[i], fn, Array.prototype.slice.call(arguments, isDel ? 4 : 3));
-      }
-    }
-    return element;
-  },
-
-  remove = function (element, orgEvents, fn) {
-    var k, type, events,
-        isString = typeof(orgEvents) == 'string',
-        names = isString && orgEvents.replace(namespace, ''),
-        rm = removeListener,
-        attached = retrieveEvents(element);
-    if (isString && /\s/.test(orgEvents)) {
-      orgEvents = orgEvents.split(' ');
-      var i = orgEvents.length - 1;
-      while (remove(element, orgEvents[i]) && i--) {}
-      return element;
-    }
-    events = isString ? orgEvents.replace(stripName, '') : orgEvents;
-    if (!attached || (isString && !attached[events])) {
-      return element;
-    }
-    if (typeof fn == 'function') {
-      rm(element, events, fn);
-    } else if (names) {
-      rm(element, orgEvents);
-    } else {
-      rm = events ? rm : remove;
-      type = isString && events;
-      events = events ? (fn || attached[events] || events) : attached;
-      for (k in events) {
-        events.hasOwnProperty(k) && rm(element, type || k, events[k]);
-      }
-    }
-    return element;
-  },
-
-  fire = function (element, type) {
-    var evt, k, i, types = type.split(' ');
-    for (i = types.length; i--;) {
-      type = types[i].replace(stripName, '');
-      var isNative = nativeEvents.indexOf(type) > -1,
-          isNamespace = types[i].replace(namespace, ''),
-          handlers = retrieveEvents(element)[type];
-      if (isNamespace) {
-        isNamespace = isNamespace.split('.');
-        for (k = isNamespace.length; k--;) {
-          handlers[isNamespace[k]] && handlers[isNamespace[k]]();
-        }
-      } else if (element[eventSupport]) {
-        fireListener(isNative, type, element);
-      } else {
-        for (k in handlers) {
-          handlers.hasOwnProperty(k) && handlers[k]();
-        }
-      }
-    }
-    return element;
-  },
-
-  fireListener = W3C_MODEL ? function (isNative, type, element) {
-    evt = document.createEvent(isNative ? "HTMLEvents" : "UIEvents");
-    evt[isNative ? 'initEvent' : 'initUIEvent'](type, true, true, context, 1);
-    element.dispatchEvent(evt);
-  } : function (isNative, type, element) {
-    isNative ? element.fireEvent('on' + type, document.createEventObject()) : element['_on' + type]++;
-  },
-
-  clone = function (element, from, type) {
-    var events = retrieveEvents(from), obj, k;
-    obj = type ? events[type] : events;
-    for (k in obj) {
-      obj.hasOwnProperty(k) && (type ? add : clone)(element, type || from, type ? obj[k] : k);
-    }
-    return element;
-  },
-
-  fixEvent = function (e) {
-    var result = {};
-    if (!e) {
-      return result;
-    }
-    var type = e.type, target = e.target || e.srcElement;
-    result.preventDefault = fixEvent.preventDefault(e);
-    result.stopPropagation = fixEvent.stopPropagation(e);
-    result.target = target && target.nodeType == 3 ? target.parentNode : target;
-    if (type.indexOf('key') != -1) {
-      result.keyCode = e.which || e.keyCode;
-    } else if ((/click|mouse|menu/i).test(type)) {
-      result.rightClick = e.which == 3 || e.button == 2;
-      result.pos = { x: 0, y: 0 };
-      if (e.pageX || e.pageY) {
-        result.clientX = e.pageX;
-        result.clientY = e.pageY;
-      } else if (e.clientX || e.clientY) {
-        result.clientX = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
-        result.clientY = e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
-      }
-      overOut.test(type) && (result.relatedTarget = e.relatedTarget || e[(type == 'mouseover' ? 'from' : 'to') + 'Element']);
-    }
-    for (var k in e) {
-      if (!(k in result)) {
-        result[k] = e[k];
-      }
-    }
-    return result;
-  };
-
-  fixEvent.preventDefault = function (e) {
-    return function () {
-      if (e.preventDefault) {
-        e.preventDefault();
-      }
-      else {
-        e.returnValue = false;
-      }
-    };
-  };
-
-  fixEvent.stopPropagation = function (e) {
-    return function () {
-      if (e.stopPropagation) {
-        e.stopPropagation();
-      } else {
-        e.cancelBubble = true;
-      }
-    };
-  };
-
-  var nativeEvents = 'click,dblclick,mouseup,mousedown,contextmenu,' + //mouse buttons
-    'mousewheel,DOMMouseScroll,' + //mouse wheel
-    'mouseover,mouseout,mousemove,selectstart,selectend,' + //mouse movement
-    'keydown,keypress,keyup,' + //keyboard
-    'orientationchange,' + // mobile
-    'touchstart,touchmove,touchend,touchcancel,' + // touch
-    'gesturestart,gesturechange,gestureend,' + // gesture
-    'focus,blur,change,reset,select,submit,' + //form elements
-    'load,unload,beforeunload,resize,move,DOMContentLoaded,readystatechange,' + //window
-    'error,abort,scroll'.split(','); //misc
-
-  function check(event) {
-    var related = event.relatedTarget;
-    if (!related) {
-      return related == null;
-    }
-    return (related != this && related.prefix != 'xul' && !/document/.test(this.toString()) && !isDescendant(this, related));
-  }
-
-  var customEvents = {
-    mouseenter: { base: 'mouseover', condition: check },
-    mouseleave: { base: 'mouseout', condition: check },
-    mousewheel: { base: /Firefox/.test(navigator.userAgent) ? 'DOMMouseScroll' : 'mousewheel' }
-  };
-
-  var bean = { add: add, remove: remove, clone: clone, fire: fire };
-
-  var clean = function (el) {
-    var uid = remove(el).__uid;
-    if (uid) {
-      delete collected[uid];
-      delete registry[uid];
-    }
-  };
-
-  if (context[attachEvent]) {
-    add(context, 'unload', function () {
-      for (var k in collected) {
-        collected.hasOwnProperty(k) && clean(collected[k]);
-      }
-      context.CollectGarbage && CollectGarbage();
-    });
-  }
-
-  var oldBean = context.bean;
-  bean.noConflict = function () {
-    context.bean = oldBean;
-    return this;
-  };
-
-  (typeof module !== 'undefined' && module.exports) ?
-    (module.exports = bean) :
-    (context.bean = bean);
-
-}(this);!function () {
-  var b = bean.noConflict(),
-      integrate = function (method, type, method2) {
-        var _args = type ? [type] : [];
-        return function () {
-          for (var args, i = 0, l = this.elements.length; i < l; i++) {
-            args = [this.elements[i]].concat(_args, Array.prototype.slice.call(arguments, 0));
-            args.length == 4 && args.push($);
-            !arguments.length && method == 'add' && type && (method = 'fire');
-            b[method].apply(this, args);
-          }
-          return this;
-        };
-      };
-
-  var add = integrate('add'),
-      remove = integrate('remove'),
-      fire = integrate('fire');
-
-  var methods = {
-
-    on: add,
-    addListener: add,
-    bind: add,
-    listen: add,
-    delegate: add,
-
-    unbind: remove,
-    unlisten: remove,
-    removeListener: remove,
-    undelegate: remove,
-
-    emit: fire,
-    trigger: fire,
-
-    cloneEvents: integrate('clone'),
-
-    hover: function (enter, leave) {
-      for (var i = 0, l = this.elements.length; i < l; i++) {
-        b.add.call(this, this.elements[i], 'mouseenter', enter);
-        b.add.call(this, this.elements[i], 'mouseleave', leave);
-      }
-      return this;
-    }
-  };
-
-  var shortcuts = [
-    'blur', 'change', 'click', 'dblclick', 'error', 'focus', 'focusin',
-    'focusout', 'keydown', 'keypress', 'keyup', 'load', 'mousedown',
-    'mouseenter', 'mouseleave', 'mouseout', 'mouseover', 'mouseup',
-    'resize', 'scroll', 'select', 'submit', 'unload'
-  ];
-
-  for (var i = shortcuts.length; i--;) {
-    var shortcut = shortcuts[i];
-    methods[shortcut] = integrate('add', shortcut);
-  }
-
-  $.ender(methods, true);
-}();
 /*!
   * emile.js (c) 2009 - 2011 Thomas Fuchs
   * Licensed under the terms of the MIT license.

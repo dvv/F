@@ -81,7 +81,7 @@ function drill(obj, path) {
 //
 function caller(path) {
 	var fn = drill(this, path);
-	_.isFunction(fn) && fn.apply(null, slice.call(arguments, 1));
+	_.isFunction(fn) && fn.apply(this, slice.call(arguments, 1));
 }
 
 //

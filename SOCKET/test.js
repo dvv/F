@@ -1,3 +1,5 @@
+var _ = require('underscore');
+
 var x = {
 	a: 'b',
 	f: function(){},
@@ -135,7 +137,15 @@ function invoke(list, filter, path) {
 		if (fn && fn.apply) fn.apply(item, args);
 	}
 }
-invoke(xx, ['Foo', 'Bar', 'f2'], 12, 13, 15);
+//invoke(xx, ['Foo', 'Bar', 'f2'], 12, 13, 15);
+
+function stringy(obj) {
+	for (var k in obj) if has(obj, k) { var v = obj[k];
+		if (_.isFunction(v) && !v.id) {
+			obj[k] = '!!!' + k;
+		}
+	}
+}
 
 process.exit(0);
 
