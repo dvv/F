@@ -1390,7 +1390,7 @@ if (!JSON) {
 }());
 
 // shim IE<8 and FF with buggy stringifier
-if (!this.JSON || !~this.JSON.stringify({date:new Date(2011,4,6,10,10)},function(k,v){if(k==='date')return String('SERIALIZED');return v;}).indexOf('SERIALIZED')) {
+if (!this.JSON || typeof this.JSON !== 'function' || !~this.JSON.stringify({date:new Date(2011,4,6,10,10)},function(k,v){if(k==='date')return String('SERIALIZED');return v;}).indexOf('SERIALIZED')) {
   this.JSON = JSON;
 }
 }();

@@ -7,18 +7,42 @@ var Ws = require('./comm');
 
 //
 // given session id, return the context
+// N.B. it can be reused in vanilla middleware
 //
 function getContext(sid) {
-	// `self` will reference the client
-	var self = this;
+
+	// memorize the socket
+	var socket = this;
 
 	// N.B. in functions:
-	// `this` -- context
-	// `self` -- socket
-	// FIXME: ideally, we should not be needing `self` socket
+	// `this` === context
 
 	// anonymous user capability
 	var caps = {
+		signin: function(next, sid) {
+			var self = this;
+			function register(context) {
+				// reset the context
+				self.extend(context, true);
+				_.isFunction(next) && next();
+			}
+			// context getter is a function?
+			if (_.isFunction(getContext)) {
+				// getter's arity is > 1? --> assume it's node-style async
+				if (getContext.length > 1) {
+					getContext.call(socket, sid, function(err, result) {
+						register(result);
+					});
+				// else assume it's sync
+				} else {
+					register(getContext.call(socket, sid));
+				}
+			// context is already baked
+			// N.B. in this case there's no means to pass the socket into context's closures
+			} else {
+				register(getContext || {});
+			}
+		},
 		user: {
 		}
 	};
@@ -42,7 +66,7 @@ function getContext(sid) {
 		},
 		post: function(next, msg) {
 			var groups = _.keys(this.groups || {});
-			var r = self.invoke(function(client) {
+			var r = socket.invoke(function(client) {
 				//console.log('POSTCLIENT', client.context);
 				if (!client.context.groups) return false;
 				var g = _.keys(client.context.groups);
@@ -53,14 +77,18 @@ function getContext(sid) {
 		},
 		groups: {},
 		join: function(next, group) {
-			this.groups[group] = {};
-			_.isFunction(next) && next(this.groups);
+			var groups = this.groups;
+			groups[group] = {};
+			this.extend({groups: groups});
+			_.isFunction(next) && next();
 		},
 		leave: function(next, group) {
+			var groups = this.groups;
 			_.each(Array.prototype.slice.call(arguments, 1), function(g) {
-				delete this.groups[g];
+				delete groups[g];
 			}, this);
-			_.isFunction(next) && next(this.groups);
+			this.extend({groups: groups});
+			_.isFunction(next) && next();
 		}
 	});
 
@@ -97,12 +125,18 @@ if (true) {
 	http.on('request', middleware);
 	http.listen(3000);
 	// websocket
-	var ws = Ws.listen(http, getContext);
+	var ws = Ws.listen(http, {
+		ready: function() {
+			// `this` is the socket; here is the only place to memo it
+			// setup initial context
+			this.context.extend(getContext.call(this));
+		}
+	});
 	repl.context.ws = ws;
 }
 
 //
-// reuse the middleware for HTTPS server
+// reuse the middleware and context for HTTPS server
 //
 if (true) {
 	var https = require('https').createServer({
@@ -112,7 +146,13 @@ if (true) {
 	});
 	https.on('request', middleware);
 	https.listen(4000);
-	// websocket
-	var wss = Ws.listen(https, getContext);
+	// secure websocket
+	var wss = Ws.listen(https, {
+		ready: function() {
+			// `this` is the socket; here is the only place to memo it
+			// setup initial context
+			this.context.extend(getContext.call(this));
+		}
+	});
 	repl.context.wss = wss;
 }
