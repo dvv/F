@@ -3,7 +3,7 @@
 global._ = require('underscore');
 var Path = require('path');
 var Fs = require('fs');
-var Ws = require('./comm');
+var Ws = require('./wscomm');
 
 //
 // given session id, return the context

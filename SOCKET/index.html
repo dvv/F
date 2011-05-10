@@ -6,7 +6,6 @@
 	<!-- N.B. ender so far doesn't fire ready event for IE properly -->
 	<!--[if IE]>
 		<script type="text/javascript" src="/socket.io/socket.io.js"></script>
-		<script type="text/javascript" src="comm.js"></script>
 	<![endif]-->
 	<script type="text/javascript">
 		// augment IE. for how long, mf?!
@@ -17,8 +16,7 @@
 			socketReady();
 		} else {
 			$.script([
-				'/socket.io/socket.io.js',
-				'comm.js'
+				'/socket.io/socket.io.js'
 			], socketReady);
 		}
 		function socketReady() {
@@ -30,7 +28,7 @@
 				}
 			};
 			// establish websocket connection #1
-			window.comm = window.comm1 = new Comm(null, {
+			window.comm = window.comm1 = new $.WSComm(null, {
 				//transports: ['websocket', 'xhr-polling', 'htmlfile'],
 				ready: function(reset) {
 					// `this` is the socket. The only chance to keep it somewhere in closures
@@ -45,13 +43,13 @@
 					context.extend(_.extend({}, caps, {name: 'dvv aka Vladimir', lid: '#l1'}));
 				},
 				change: function() {
-					console.log('CHANGE:');//, arguments);
+					//console.log('CHANGE:');//, arguments);
 				}
 			});
 // demonstrate multi connections work
 if (true) {
 			// establish websocket connection #2
-			window.comm2 = new Comm(null, {
+			window.comm2 = new $.WSComm(null, {
 				/* any other host and options you like! */
 				ready: function(reset) {
 					console.log('READY!', reset);
@@ -61,7 +59,7 @@ if (true) {
 				}
 			});
 			// establish websocket connection #N
-			window.comm3 = new Comm(null, {
+			window.comm3 = new $.WSComm(null, {
 				/* any other host and options you like! */
 				ready: function(reset) {
 					console.log('READY!', reset);
@@ -72,6 +70,8 @@ if (true) {
 			});
 }
 $.domReady(function() {
+			// disable buttons until contexts are ready
+			$('input[data-id]').parents('div',true).find('button').enable(false);
 			// handle posting
 			$('body').delegate('button.send', 'click', function(ev) {
 				var input = $(this).previous();
@@ -105,7 +105,7 @@ $.domReady(function() {
 				}, text);
 			});
 			// handle signin
-			/*$('body').delegate('button.signin', 'click', function(ev) {
+			$('body').delegate('button.signin', 'click', function(ev) {
 				var input = $(this).previous().previous().previous().previous();
 				var id = input.attr('data-id');
 				var text = input.val();
@@ -113,17 +113,23 @@ $.domReady(function() {
 					console.log('SIGNED!', arguments);
 					input.val('');
 				}, text);
-			});*/
+			});
 });
 		}
 	</script>
 </head>
 <body>
+<div>
 Your message as dvv: <input data-id="1" type="text"/><button class="send">Send</button><button class="join">Join</button><button class="leave">Leave</button><button class="signin">Sign In</button><br/>
 <ol id="l1"></ol>
+</div>
+<div>
 Your message as Vladimir: <input data-id="2" type="text"/><button class="send">Send</button><button class="join">Join</button><button class="leave">Leave</button><button class="signin">Sign In</button><br/>
 <ol id="l2"></ol>
+</div>
+<div>
 Your message as dronnikov@gmail.com: <input data-id="3" type="text"/><button class="send">Send</button><button class="join">Join</button><button class="leave">Leave</button><button class="signin">Sign In</button><br/>
 <ol id="l3"></ol>
+</div>
 </body>
 </html>

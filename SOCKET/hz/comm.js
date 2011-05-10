@@ -77,7 +77,10 @@ function caller(path) {
 //
 function invoke(list, filter, path) {
 	var args = slice.call(arguments, 2);
+	// filter the list if the filtering function is given
 	if (_.isFunction(filter)) list = _.filter(list, filter);
+	// return the filtered list unless arguments to make call are given
+	if (!args.length) return list;
 	_.each(list, function(item) {
 		//caller.apply(item.context, args);
 		item.context.rpc.apply(item.context, args);
@@ -98,12 +101,19 @@ function createContext() {
 	// create shared context
 	function Context() {};
 	// N.B. anything put in prototype won't be shared with remote end
+	// extend shared context
 	Context.prototype.extend = function(changes, reset) {
 		socket.update(changes, reset, true);
 	};
+	// called at client-side when server-side sets the context
 	Context.prototype.ready = this.options.ready;
+	// called before change occurs in to property
+	// signature is function(prop, oldvalue, newvalue)
+	// return something other than undefined to inhibit assigning to
+	// the `prop`
 	Context.prototype.change = this.options.change;
-	// ???
+	// called before updating the shared context.
+	// return value other than undefined means validation is rejected
 	Context.prototype.validate = function(changes, reset) {
 		if (_.isFunction(changes)) {
 			this.constructor.prototype.validate = changes;
@@ -151,7 +161,7 @@ function createContext() {
 	//
 	// send the reply to remote side
 	//
-	this.reply = function(id /*, args... */) {
+	function reply(id /*, args... */) {
 		var args = slice.call(arguments, 1);
 		if (!id) return;
 		this.send({
@@ -236,7 +246,7 @@ function createContext() {
 			(fn = drill(this.context, message.method))) {
 			// the signature is function(callback[, arg1[, arg2[, ...]]])
 			// N.B. we will reply to caller only if message.id is given
-			var args = [_.bind(this.reply, this, message.id)];
+			var args = [_.bind(reply, this, message.id)];
 			// optional arguments come from message.params
 			if (message.params) {
 				push.apply(args, message.params);
@@ -254,9 +264,8 @@ function createContext() {
 		} else if (message.cmd === 'context') {
 			this.update.apply(this, message.params);
 			// fire 'ready' callback
-			if (CLIENT_SIDE) {
-				_.isFunction(this.context.ready) &&
-					this.context.ready.call(this, message.params[1]);
+			if (CLIENT_SIDE && _.isFunction(this.context.ready)) {
+				this.context.ready.call(this, message.params[1]);
 			}
 		}
 	});
@@ -296,6 +305,9 @@ if (CLIENT_SIDE) {
 		return ctx;
 	};
 
+	// ender.js shim
+  (typeof module !== 'undefined') && module.exports && (module.exports = Comm);
+
 } else {
 
 	//
@@ -319,6 +331,8 @@ if (CLIENT_SIDE) {
 		});
 
 		// FIXME: purely debugging helpers
+		//
+		//
 		Object.defineProperties(ws, {
 			everyone: {
 				get: function() {
@@ -336,6 +350,9 @@ if (CLIENT_SIDE) {
 				}
 			}
 		});
+		//
+		//
+		//
 
 		// remote function invocation helper
 		// invoke(filterFunc, path-to-method, arg1, arg2, ...)
