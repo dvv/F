@@ -45,11 +45,28 @@ function has(obj, prop) {
 }
 
 //
+// shallow extend the `dst` with properties of `src`
+// if a property of `src` is set to null then remove corresponding
+// `dst` property
+// TODO: more elaborate version, may be even deep merge?
+//
+function extend123(dst, src) {
+	if (!src) return dst;
+	for (var prop in src) if (has(src, prop)) {
+		if (src[prop] === null) {
+			delete dst[prop];
+		} else {
+			dst[prop] = src[prop];
+		}
+	}
+	return dst;
+}
+
+//
 // safely get a deep property of `obj` descending
 // using elements in `path`
 //
 function drill(obj, path) {
-	var part;
 	if (_.isArray(path)) {
 		for (var i = 0, l = path.length; i < l; i++) {
 			part = path[i];
@@ -79,8 +96,7 @@ function invoke(list, filter, path) {
 	var args = slice.call(arguments, 2);
 	if (_.isFunction(filter)) list = _.filter(list, filter);
 	_.each(list, function(item) {
-		//caller.apply(item.context, args);
-		item.context.rpc.apply(item.context, args);
+		caller.apply(item.context, args);
 	});
 }
 
@@ -111,42 +127,86 @@ function createContext() {
 		}
 		return undefined;
 	};
-	// invoke a remote function by `path`
-	Context.prototype.rpc = function(path, callback /*, args...*/) {
-		var args = slice.call(arguments, 1);
-		// register callback, if any
-		if (_.isFunction(callback)) {
-			// consume `callback` argument
-			args.shift();
-			// N.B. callbacks are deleted once they are fired.
-			// unless a callback is fired, it holds the memory.
-			// we should introduce expiration for callbacks
-			var id = nonce();
-			socket.cbs[id] = callback;
-		}
-		// RPC
-		var msg = {cmd: 'call', id: id, method: path, params: args};
-		socket.send(msg);
+	// FIXME: debugging only
+	Context.prototype.fnsfn = function() {
+		return socket.fns;
 	};
 	this.context = new Context();
 
+	// exposed functions
+	this.fns = {};
 	// callbacks
 	this.cbs = {};
 
 	//
+	// register a uniquely identified wrapper which calls a remote function
+	//
+	function registerRemoteFunction(fid) {
+		var self = this;
+		var fn = function(callback /*, args...*/) {
+			var args = slice.call(arguments);
+			// register callback
+			if (_.isFunction(callback)) {
+				// consume `callback` argument
+				args.shift();
+				// N.B. callbacks are deleted once they are fired.
+				// unless a callback is fired, it holds the memory.
+				// we should introduce expiration for callbacks
+				var id = nonce();
+				self.cbs[id] = callback;
+			}
+			// RPC
+			var msg = {cmd: 'call', id: id, method: fid, params: args};
+			self.send(msg);
+		};
+		// give function an ID to mark it as remote and
+		// inhibit passing back to the remote end
+		fn.id = fid;
+		return fn;
+	}
+
+	//
 	// replace functions in `msg` with THIS_IS_FUNC signatures
+	// and assign unique ids to them
 	//
 	this.sendWithFunctions = function(msg) {
 		var self = this;
 		function replacer(k, v) {
-			if (_.isFunction(v)) {
-				v = THIS_IS_FUNC;
+			// N.B. reparsed functions (having ids) no pasaran
+			if (_.isFunction(v) && !v.id) {
+				// FIXME: should not prepend with `k` in production
+				var fid = k + '_' + nonce();
+				self.fns[fid] = v;
+				v = THIS_IS_FUNC + fid;
 			}
 			return v;
 		}
 		var s = '~j~'+JSON.stringify(msg, replacer);
 		this.send(s);
 	}
+
+	//
+	// revive functions from THIS_IS_FUNC signatures
+	// N.B. see the issue we've opened to ease reparsing at
+	// https://github.com/LearnBoost/Socket.IO-node/issues/198#issuecomment-1116199
+	//
+	this.parseWithFunctions = function(msg) {
+		var self = this;
+		var result = JSON.parse(JSON.stringify(msg), function(k, v) {
+			// register each function in the context
+			// FIXME: shouldn't it be done in lazy way via getters?
+			// FIXME: how portable is it in browsers then?
+			if (v && typeof v === 'string' &&
+				v.substring(0, THIS_IS_FUNC_LEN) === THIS_IS_FUNC) {
+				// extract function id
+				var fid = v.substring(THIS_IS_FUNC_LEN);
+				// register the wrapper function
+				v = registerRemoteFunction.call(self, fid);
+			}
+			return v;
+		});
+		return result;
+	};
 
 	//
 	// send the reply to remote side
@@ -161,12 +221,6 @@ function createContext() {
 		});
 	};
 
-	//
-	// shallow extend the `dst` with properties of `src`
-	// if a property of `src` is set to null then remove corresponding
-	// `dst` property
-	// TODO: more elaborate version, may be even deep merge?
-	//
 	function extend(dst, src) {
 		if (!src) return dst;
 		for (var prop in src) if (has(src, prop)) {
@@ -186,7 +240,15 @@ function createContext() {
 				if (_.isFunction(socket.context.change) &&
 					socket.context.change(prop, v, d) !== undefined)
 					continue;
-				// assign new value
+				// N.B. is `d` is a function, 
+				// it must be removed from socket.fns as well!
+				if (_.isFunction(d)) {
+					for (var i in socket.fns) {
+						if (socket.fns[i] === d) {
+							delete socket.fns[i];
+						}
+					}
+				}
 				if (v == null) {
 					delete dst[prop];
 				} else {
@@ -211,6 +273,7 @@ function createContext() {
 		// N.B. do not overwrite `context`, only mangle! That's why
 		// this way of purging old context
 		if (reset) {
+			this.fns = {};
 			for (var i in context) delete context[i];
 		}
 		extend(context, changes);
@@ -229,11 +292,11 @@ function createContext() {
 	//
 	this.on('message', function(message) {
 		if (!message) return;
-		//console.log('MESSAGE', message);
+		console.log('MESSAGE', message);
 		var fn;
 		// remote side calls this side method
-		if (message.cmd === 'call' &&
-			(fn = drill(this.context, message.method))) {
+		if (message.cmd === 'call' && typeof message.method === 'string' &&
+			(fn = this.fns[message.method])) {
 			// the signature is function(callback[, arg1[, arg2[, ...]]])
 			// N.B. we will reply to caller only if message.id is given
 			var args = [_.bind(this.reply, this, message.id)];
@@ -251,10 +314,17 @@ function createContext() {
 			// callback
 			fn.apply(this.context, message.params);
 		// remote context has changed
+		// N.B. for security reasons, should be the only branch
+		// which honors receiving functions
 		} else if (message.cmd === 'context') {
+			if (message.params) {
+				message.params = this.parseWithFunctions(message.params);
+			}
 			this.update.apply(this, message.params);
 			// fire 'ready' callback
 			if (CLIENT_SIDE) {
+				//_.isFunction(this.options.ready) &&
+				//	this.options.ready.call(this, message.params[1]);
 				_.isFunction(this.context.ready) &&
 					this.context.ready.call(this, message.params[1]);
 			}

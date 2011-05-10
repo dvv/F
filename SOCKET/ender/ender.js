@@ -3,7 +3,7 @@
   * copyright Dustin Diaz & Jacob Thornton 2011 (@ded @fat)
   * https://ender.no.de
   * License MIT
-  * Build: ender -b jeesh json-browser
+  * Build: ender -b jeesh scriptjs backbone json-browser
   */
 !function (context) {
 
@@ -43,9 +43,618 @@
   };
 
   (typeof module !== 'undefined') && module.exports && (module.exports = ender);
-  context.ender = context.$ = ender;
+  context['ender'] = context['$'] = ender;
 
 }(this);
+/*!
+  * $script.js v1.3
+  * https://github.com/ded/script.js
+  * Copyright: @ded & @fat - Dustin Diaz, Jacob Thornton 2011
+  * Follow our software http://twitter.com/dedfat
+  * License: MIT
+  */
+!function(win, doc, timeout) {
+  var script = doc.getElementsByTagName("script")[0],
+      list = {}, ids = {}, delay = {}, re = /^i|c/,
+      scripts = {}, s = 'string', f = false,
+      push = 'push', domContentLoaded = 'DOMContentLoaded', readyState = 'readyState',
+      addEventListener = 'addEventListener', onreadystatechange = 'onreadystatechange',
+      every = function(ar, fn) {
+        for (var i = 0, j = ar.length; i < j; ++i) {
+          if (!fn(ar[i])) {
+            return 0;
+          }
+        }
+        return 1;
+      };
+      function each(ar, fn) {
+        every(ar, function(el) {
+          return !fn(el);
+        });
+      }
+
+  if (!doc[readyState] && doc[addEventListener]) {
+    doc[addEventListener](domContentLoaded, function fn() {
+      doc.removeEventListener(domContentLoaded, fn, f);
+      doc[readyState] = "complete";
+    }, f);
+    doc[readyState] = "loading";
+  }
+
+  var $script = function(paths, idOrDone, optDone) {
+    paths = paths[push] ? paths : [paths];
+    var idOrDoneIsDone = idOrDone && idOrDone.call,
+        done = idOrDoneIsDone ? idOrDone : optDone,
+        id = idOrDoneIsDone ? paths.join('') : idOrDone,
+        queue = paths.length;
+        function loopFn(item) {
+          return item.call ? item() : list[item];
+        }
+        function callback() {
+          if (!--queue) {
+            list[id] = 1;
+            done && done();
+            for (var dset in delay) {
+              every(dset.split('|'), loopFn) && !each(delay[dset], loopFn) && (delay[dset] = []);
+            }
+          }
+        }
+    timeout(function() {
+      each(paths, function(path) {
+        if (scripts[path]) {
+          id && (ids[id] = 1);
+          callback();
+          return;
+        }
+        scripts[path] = 1;
+        id && (ids[id] = 1);
+        create($script.path ?
+          $script.path + path + '.js' :
+          path, callback);
+      });
+    }, 0);
+    return $script;
+  };
+
+  function create(path, fn) {
+    var el = doc.createElement("script"),
+        loaded = 0;
+    el.onload = el[onreadystatechange] = function () {
+      if ((el[readyState] && !(!re.test(el[readyState]))) || loaded) {
+        return;
+      }
+      el.onload = el[onreadystatechange] = null;
+      loaded = 1;
+      fn();
+    };
+    el.async = 1;
+    el.src = path;
+    script.parentNode.insertBefore(el, script);
+  }
+
+  $script.get = create;
+
+  $script.ready = function(deps, ready, req) {
+    deps = deps[push] ? deps : [deps];
+    var missing = [];
+    !each(deps, function(dep) {
+      list[dep] || missing[push](dep);
+    }) && every(deps, function(dep) {
+      return list[dep];
+    }) ? ready() : !function(key) {
+      delay[key] = delay[key] || [];
+      delay[key][push](ready);
+      req && req(missing);
+    }(deps.join('|'));
+    return $script;
+  };
+
+  var old = win.$script;
+  $script.noConflict = function () {
+    win.$script = old;
+    return this;
+  };
+
+  (typeof module !== 'undefined' && module.exports) ?
+    (module.exports = $script) :
+    (win.$script = $script);
+
+}(this, document, setTimeout);
+!function () {
+  var s = $script.noConflict();
+  $.ender({
+    script: s,
+    ready: s.ready,
+    require: s,
+    getScript: s.get
+  });
+}();
+!function () { var exports = {}, module = { exports: exports }; /*
+    http://www.JSON.org/json2.js
+    2011-02-23
+
+    Public Domain.
+
+    NO WARRANTY EXPRESSED OR IMPLIED. USE AT YOUR OWN RISK.
+
+    See http://www.JSON.org/js.html
+
+
+    This code should be minified before deployment.
+    See http://javascript.crockford.com/jsmin.html
+
+    USE YOUR OWN COPY. IT IS EXTREMELY UNWISE TO LOAD CODE FROM SERVERS YOU DO
+    NOT CONTROL.
+
+
+    This file creates a global JSON object containing two methods: stringify
+    and parse.
+
+        JSON.stringify(value, replacer, space)
+            value       any JavaScript value, usually an object or array.
+
+            replacer    an optional parameter that determines how object
+                        values are stringified for objects. It can be a
+                        function or an array of strings.
+
+            space       an optional parameter that specifies the indentation
+                        of nested structures. If it is omitted, the text will
+                        be packed without extra whitespace. If it is a number,
+                        it will specify the number of spaces to indent at each
+                        level. If it is a string (such as '\t' or '&nbsp;'),
+                        it contains the characters used to indent at each level.
+
+            This method produces a JSON text from a JavaScript value.
+
+            When an object value is found, if the object contains a toJSON
+            method, its toJSON method will be called and the result will be
+            stringified. A toJSON method does not serialize: it returns the
+            value represented by the name/value pair that should be serialized,
+            or undefined if nothing should be serialized. The toJSON method
+            will be passed the key associated with the value, and this will be
+            bound to the value
+
+            For example, this would serialize Dates as ISO strings.
+
+                Date.prototype.toJSON = function (key) {
+                    function f(n) {
+                        // Format integers to have at least two digits.
+                        return n < 10 ? '0' + n : n;
+                    }
+
+                    return this.getUTCFullYear()   + '-' +
+                         f(this.getUTCMonth() + 1) + '-' +
+                         f(this.getUTCDate())      + 'T' +
+                         f(this.getUTCHours())     + ':' +
+                         f(this.getUTCMinutes())   + ':' +
+                         f(this.getUTCSeconds())   + 'Z';
+                };
+
+            You can provide an optional replacer method. It will be passed the
+            key and value of each member, with this bound to the containing
+            object. The value that is returned from your method will be
+            serialized. If your method returns undefined, then the member will
+            be excluded from the serialization.
+
+            If the replacer parameter is an array of strings, then it will be
+            used to select the members to be serialized. It filters the results
+            such that only members with keys listed in the replacer array are
+            stringified.
+
+            Values that do not have JSON representations, such as undefined or
+            functions, will not be serialized. Such values in objects will be
+            dropped; in arrays they will be replaced with null. You can use
+            a replacer function to replace those with JSON values.
+            JSON.stringify(undefined) returns undefined.
+
+            The optional space parameter produces a stringification of the
+            value that is filled with line breaks and indentation to make it
+            easier to read.
+
+            If the space parameter is a non-empty string, then that string will
+            be used for indentation. If the space parameter is a number, then
+            the indentation will be that many spaces.
+
+            Example:
+
+            text = JSON.stringify(['e', {pluribus: 'unum'}]);
+            // text is '["e",{"pluribus":"unum"}]'
+
+
+            text = JSON.stringify(['e', {pluribus: 'unum'}], null, '\t');
+            // text is '[\n\t"e",\n\t{\n\t\t"pluribus": "unum"\n\t}\n]'
+
+            text = JSON.stringify([new Date()], function (key, value) {
+                return this[key] instanceof Date ?
+                    'Date(' + this[key] + ')' : value;
+            });
+            // text is '["Date(---current time---)"]'
+
+
+        JSON.parse(text, reviver)
+            This method parses a JSON text to produce an object or array.
+            It can throw a SyntaxError exception.
+
+            The optional reviver parameter is a function that can filter and
+            transform the results. It receives each of the keys and values,
+            and its return value is used instead of the original value.
+            If it returns what it received, then the structure is not modified.
+            If it returns undefined then the member is deleted.
+
+            Example:
+
+            // Parse the text. Values that look like ISO date strings will
+            // be converted to Date objects.
+
+            myData = JSON.parse(text, function (key, value) {
+                var a;
+                if (typeof value === 'string') {
+                    a =
+/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}(?:\.\d*)?)Z$/.exec(value);
+                    if (a) {
+                        return new Date(Date.UTC(+a[1], +a[2] - 1, +a[3], +a[4],
+                            +a[5], +a[6]));
+                    }
+                }
+                return value;
+            });
+
+            myData = JSON.parse('["Date(09/09/2001)"]', function (key, value) {
+                var d;
+                if (typeof value === 'string' &&
+                        value.slice(0, 5) === 'Date(' &&
+                        value.slice(-1) === ')') {
+                    d = new Date(value.slice(5, -1));
+                    if (d) {
+                        return d;
+                    }
+                }
+                return value;
+            });
+
+
+    This is a reference implementation. You are free to copy, modify, or
+    redistribute.
+*/
+
+/*jslint evil: true, strict: false, regexp: false */
+
+/*members "", "\b", "\t", "\n", "\f", "\r", "\"", JSON, "\\", apply,
+    call, charCodeAt, getUTCDate, getUTCFullYear, getUTCHours,
+    getUTCMinutes, getUTCMonth, getUTCSeconds, hasOwnProperty, join,
+    lastIndex, length, parse, prototype, push, replace, slice, stringify,
+    test, toJSON, toString, valueOf
+*/
+
+
+// Create a JSON object only if one does not already exist. We create the
+// methods in a closure to avoid creating global variables.
+
+var JSON;
+if (!JSON) {
+    JSON = {};
+}
+
+(function () {
+    "use strict";
+
+    function f(n) {
+        // Format integers to have at least two digits.
+        return n < 10 ? '0' + n : n;
+    }
+
+    if (typeof Date.prototype.toJSON !== 'function') {
+
+        Date.prototype.toJSON = function (key) {
+
+            return isFinite(this.valueOf()) ?
+                this.getUTCFullYear()     + '-' +
+                f(this.getUTCMonth() + 1) + '-' +
+                f(this.getUTCDate())      + 'T' +
+                f(this.getUTCHours())     + ':' +
+                f(this.getUTCMinutes())   + ':' +
+                f(this.getUTCSeconds())   + 'Z' : null;
+        };
+
+        String.prototype.toJSON      =
+            Number.prototype.toJSON  =
+            Boolean.prototype.toJSON = function (key) {
+                return this.valueOf();
+            };
+    }
+
+    var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
+        escapable = /[\\\"\x00-\x1f\x7f-\x9f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
+        gap,
+        indent,
+        meta = {    // table of character substitutions
+            '\b': '\\b',
+            '\t': '\\t',
+            '\n': '\\n',
+            '\f': '\\f',
+            '\r': '\\r',
+            '"' : '\\"',
+            '\\': '\\\\'
+        },
+        rep;
+
+
+    function quote(string) {
+
+// If the string contains no control characters, no quote characters, and no
+// backslash characters, then we can safely slap some quotes around it.
+// Otherwise we must also replace the offending characters with safe escape
+// sequences.
+
+        escapable.lastIndex = 0;
+        return escapable.test(string) ? '"' + string.replace(escapable, function (a) {
+            var c = meta[a];
+            return typeof c === 'string' ? c :
+                '\\u' + ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+        }) + '"' : '"' + string + '"';
+    }
+
+
+    function str(key, holder) {
+
+// Produce a string from holder[key].
+
+        var i,          // The loop counter.
+            k,          // The member key.
+            v,          // The member value.
+            length,
+            mind = gap,
+            partial,
+            value = holder[key];
+
+// If the value has a toJSON method, call it to obtain a replacement value.
+
+        if (value && typeof value === 'object' &&
+                typeof value.toJSON === 'function') {
+            value = value.toJSON(key);
+        }
+
+// If we were called with a replacer function, then call the replacer to
+// obtain a replacement value.
+
+        if (typeof rep === 'function') {
+            value = rep.call(holder, key, value);
+        }
+
+// What happens next depends on the value's type.
+
+        switch (typeof value) {
+        case 'string':
+            return quote(value);
+
+        case 'number':
+
+// JSON numbers must be finite. Encode non-finite numbers as null.
+
+            return isFinite(value) ? String(value) : 'null';
+
+        case 'boolean':
+        case 'null':
+
+// If the value is a boolean or null, convert it to a string. Note:
+// typeof null does not produce 'null'. The case is included here in
+// the remote chance that this gets fixed someday.
+
+            return String(value);
+
+// If the type is 'object', we might be dealing with an object or an array or
+// null.
+
+        case 'object':
+
+// Due to a specification blunder in ECMAScript, typeof null is 'object',
+// so watch out for that case.
+
+            if (!value) {
+                return 'null';
+            }
+
+// Make an array to hold the partial results of stringifying this object value.
+
+            gap += indent;
+            partial = [];
+
+// Is the value an array?
+
+            if (Object.prototype.toString.apply(value) === '[object Array]') {
+
+// The value is an array. Stringify every element. Use null as a placeholder
+// for non-JSON values.
+
+                length = value.length;
+                for (i = 0; i < length; i += 1) {
+                    partial[i] = str(i, value) || 'null';
+                }
+
+// Join all of the elements together, separated with commas, and wrap them in
+// brackets.
+
+                v = partial.length === 0 ? '[]' : gap ?
+                    '[\n' + gap + partial.join(',\n' + gap) + '\n' + mind + ']' :
+                    '[' + partial.join(',') + ']';
+                gap = mind;
+                return v;
+            }
+
+// If the replacer is an array, use it to select the members to be stringified.
+
+            if (rep && typeof rep === 'object') {
+                length = rep.length;
+                for (i = 0; i < length; i += 1) {
+                    if (typeof rep[i] === 'string') {
+                        k = rep[i];
+                        v = str(k, value);
+                        if (v) {
+                            partial.push(quote(k) + (gap ? ': ' : ':') + v);
+                        }
+                    }
+                }
+            } else {
+
+// Otherwise, iterate through all of the keys in the object.
+
+                for (k in value) {
+                    if (Object.prototype.hasOwnProperty.call(value, k)) {
+                        v = str(k, value);
+                        if (v) {
+                            partial.push(quote(k) + (gap ? ': ' : ':') + v);
+                        }
+                    }
+                }
+            }
+
+// Join all of the member texts together, separated with commas,
+// and wrap them in braces.
+
+            v = partial.length === 0 ? '{}' : gap ?
+                '{\n' + gap + partial.join(',\n' + gap) + '\n' + mind + '}' :
+                '{' + partial.join(',') + '}';
+            gap = mind;
+            return v;
+        }
+    }
+
+// If the JSON object does not yet have a stringify method, give it one.
+
+    if (typeof JSON.stringify !== 'function') {
+        JSON.stringify = function (value, replacer, space) {
+
+// The stringify method takes a value and an optional replacer, and an optional
+// space parameter, and returns a JSON text. The replacer can be a function
+// that can replace values, or an array of strings that will select the keys.
+// A default replacer method can be provided. Use of the space parameter can
+// produce text that is more easily readable.
+
+            var i;
+            gap = '';
+            indent = '';
+
+// If the space parameter is a number, make an indent string containing that
+// many spaces.
+
+            if (typeof space === 'number') {
+                for (i = 0; i < space; i += 1) {
+                    indent += ' ';
+                }
+
+// If the space parameter is a string, it will be used as the indent string.
+
+            } else if (typeof space === 'string') {
+                indent = space;
+            }
+
+// If there is a replacer, it must be a function or an array.
+// Otherwise, throw an error.
+
+            rep = replacer;
+            if (replacer && typeof replacer !== 'function' &&
+                    (typeof replacer !== 'object' ||
+                    typeof replacer.length !== 'number')) {
+                throw new Error('JSON.stringify');
+            }
+
+// Make a fake root object containing our value under the key of ''.
+// Return the result of stringifying the value.
+
+            return str('', {'': value});
+        };
+    }
+
+
+// If the JSON object does not yet have a parse method, give it one.
+
+    if (typeof JSON.parse !== 'function') {
+        JSON.parse = function (text, reviver) {
+
+// The parse method takes a text and an optional reviver function, and returns
+// a JavaScript value if the text is a valid JSON text.
+
+            var j;
+
+            function walk(holder, key) {
+
+// The walk method is used to recursively walk the resulting structure so
+// that modifications can be made.
+
+                var k, v, value = holder[key];
+                if (value && typeof value === 'object') {
+                    for (k in value) {
+                        if (Object.prototype.hasOwnProperty.call(value, k)) {
+                            v = walk(value, k);
+                            if (v !== undefined) {
+                                value[k] = v;
+                            } else {
+                                delete value[k];
+                            }
+                        }
+                    }
+                }
+                return reviver.call(holder, key, value);
+            }
+
+
+// Parsing happens in four stages. In the first stage, we replace certain
+// Unicode characters with escape sequences. JavaScript handles many characters
+// incorrectly, either silently deleting them, or treating them as line endings.
+
+            text = String(text);
+            cx.lastIndex = 0;
+            if (cx.test(text)) {
+                text = text.replace(cx, function (a) {
+                    return '\\u' +
+                        ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+                });
+            }
+
+// In the second stage, we run the text against regular expressions that look
+// for non-JSON patterns. We are especially concerned with '()' and 'new'
+// because they can cause invocation, and '=' because it can cause mutation.
+// But just to be safe, we want to reject all unexpected forms.
+
+// We split the second stage into 4 regexp operations in order to work around
+// crippling inefficiencies in IE's and Safari's regexp engines. First we
+// replace the JSON backslash pairs with '@' (a non-JSON character). Second, we
+// replace all simple value tokens with ']' characters. Third, we delete all
+// open brackets that follow a colon or comma or that begin the text. Finally,
+// we look to see that the remaining characters are only whitespace or ']' or
+// ',' or ':' or '{' or '}'. If that is so, then the text is safe for eval.
+
+            if (/^[\],:{}\s]*$/
+                    .test(text.replace(/\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g, '@')
+                        .replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, ']')
+                        .replace(/(?:^|:|,)(?:\s*\[)+/g, ''))) {
+
+// In the third stage we use the eval function to compile the text into a
+// JavaScript structure. The '{' operator is subject to a syntactic ambiguity
+// in JavaScript: it can begin a block or an object literal. We wrap the text
+// in parens to eliminate the ambiguity.
+
+                j = eval('(' + text + ')');
+
+// In the optional fourth stage, we recursively walk the new structure, passing
+// each name/value pair to a reviver function for possible transformation.
+
+                return typeof reviver === 'function' ?
+                    walk({'': j}, '') : j;
+            }
+
+// If the text is not JSON parseable, then a SyntaxError is thrown.
+
+            throw new SyntaxError('JSON.parse');
+        };
+    }
+}());
+
+// shim IE<8 and FF with buggy stringifier
+if (!this.JSON || typeof this.JSON.stringify !== 'function' || !~this.JSON.stringify({date:new Date(2011,4,6,10,10)},function(k,v){if(k==='date')return String('SERIALIZED');return v;}).indexOf('SERIALIZED')) {
+  this.JSON = JSON;
+}
+ $.ender(module.exports); }();
 !function () { var exports = {}, module = { exports: exports }; !function (doc) {
   var loaded = 0, fns = [], ol, f = false,
       testEl = doc.createElement('a'),
@@ -100,6 +709,1356 @@
       (window.domReady = domReady);
 
 }(document); $.ender(module.exports); }();
+/*!
+  * qwery.js - copyright @dedfat
+  * https://github.com/ded/qwery
+  * Follow our software http://twitter.com/dedfat
+  * MIT License
+  */
+!function (context, doc) {
+
+  var c, i, j, k, l, m, o, p, r, v,
+      el, node, len, found, classes, item, items, token, collection,
+      id = /#([\w\-]+)/,
+      clas = /\.[\w\-]+/g,
+      idOnly = /^#([\w\-]+$)/,
+      classOnly = /^\.([\w\-]+)$/,
+      tagOnly = /^([\w\-]+)$/,
+      tagAndOrClass = /^([\w]+)?\.([\w\-]+)$/,
+      html = doc.documentElement,
+      tokenizr = /\s(?![\s\w\-\/\?\&\=\:\.\(\)\!,@#%<>\{\}\$\*\^'"]*\])/,
+      simple = /^([a-z0-9]+)?(?:([\.\#]+[\w\-\.#]+)?)/,
+      attr = /\[([\w\-]+)(?:([\|\^\$\*\~]?\=)['"]?([ \w\-\/\?\&\=\:\.\(\)\!,@#%<>\{\}\$\*\^]+)["']?)?\]/,
+      chunker = new RegExp(simple.source + '(' + attr.source + ')?');
+
+  function array(ar) {
+    r = [];
+    for (i = 0, len = ar.length; i < len; i++) {
+      r[i] = ar[i];
+    }
+    return r;
+  }
+
+  var cache = function () {
+    this.c = {};
+  };
+  cache.prototype = {
+    g: function (k) {
+      return this.c[k] || undefined;
+    },
+    s: function (k, v) {
+      this.c[k] = v;
+      return v;
+    }
+  };
+
+  var classCache = new cache(),
+      cleanCache = new cache(),
+      attrCache = new cache(),
+      tokenCache = new cache();
+
+  function q(query) {
+    return query.match(chunker);
+  }
+
+  function interpret(whole, tag, idsAndClasses, wholeAttribute, attribute, qualifier, value) {
+    var m, c, k;
+    if (tag && this.tagName.toLowerCase() !== tag) {
+      return false;
+    }
+    if (idsAndClasses && (m = idsAndClasses.match(id)) && m[1] !== this.id) {
+      return false;
+    }
+    if (idsAndClasses && (classes = idsAndClasses.match(clas))) {
+      for (i = classes.length; i--;) {
+        c = classes[i].slice(1);
+        if (!(classCache.g(c) || classCache.s(c, new RegExp('(^|\\s+)' + c + '(\\s+|$)'))).test(this.className)) {
+          return false;
+        }
+      }
+    }
+    if (wholeAttribute && !value) {
+      o = this.attributes;
+      for (k in o) {
+        if (Object.prototype.hasOwnProperty.call(o, k) && (o[k].name || k) == attribute) {
+          return this;
+        }
+      }
+    }
+    if (wholeAttribute && !checkAttr(qualifier, this.getAttribute(attribute) || '', value)) {
+      return false;
+    }
+    return this;
+  }
+
+  function loopAll(tokens) {
+    var r = [], token = tokens.pop(), intr = q(token), tag = intr[1] || '*', i, l, els,
+        root = tokens.length && (m = tokens[0].match(idOnly)) ? doc.getElementById(m[1]) : doc;
+    if (!root) {
+      return r;
+    }
+    els = root.getElementsByTagName(tag);
+    for (i = 0, l = els.length; i < l; i++) {
+      el = els[i];
+      if (item = interpret.apply(el, intr)) {
+        r.push(item);
+      }
+    }
+    return r;
+  }
+
+  function clean(s) {
+    return cleanCache.g(s) || cleanCache.s(s, s.replace(/([.*+?\^=!:${}()|\[\]\/\\])/g, '\\$1'));
+  }
+
+  function checkAttr(qualify, actual, val) {
+    switch (qualify) {
+    case '=':
+      return actual == val;
+    case '^=':
+      return actual.match(attrCache.g('^=' + val) || attrCache.s('^=' + val, new RegExp('^' + clean(val))));
+    case '$=':
+      return actual.match(attrCache.g('$=' + val) || attrCache.s('$=' + val, new RegExp(clean(val) + '$')));
+    case '*=':
+      return actual.match(attrCache.g(val) || attrCache.s(val, new RegExp(clean(val))));
+    case '~=':
+      return actual.match(attrCache.g('~=' + val) || attrCache.s('~=' + val, new RegExp('(?:^|\\s+)' + clean(val) + '(?:\\s+|$)')));
+    case '|=':
+      return actual.match(attrCache.g('|=' + val) || attrCache.s('|=' + val, new RegExp('^' + clean(val) + '(-|$)')));
+    }
+    return false;
+  }
+
+  function _qwery(selector) {
+    var r = [], ret = [], i, l,
+        tokens = tokenCache.g(selector) || tokenCache.s(selector, selector.split(tokenizr));
+    tokens = tokens.slice(0);
+    if (!tokens.length) {
+      return r;
+    }
+    r = loopAll(tokens);
+    if (!tokens.length) {
+      return r;
+    }
+    // loop through all descendent tokens
+    for (j = 0, l = r.length, k = 0; j < l; j++) {
+      node = r[j];
+      p = node;
+      // loop through each token
+      for (i = tokens.length; i--;) {
+        z: // loop through parent nodes
+        while (p !== html && (p = p.parentNode)) {
+          if (found = interpret.apply(p, q(tokens[i]))) {
+            break z;
+          }
+        }
+      }
+      found && (ret[k++] = node);
+    }
+    return ret;
+  }
+
+  var isAncestor = 'compareDocumentPosition' in html ?
+    function (element, container) {
+      return (container.compareDocumentPosition(element) & 16) == 16;
+    } : 'contains' in html ?
+    function (element, container) {
+      return container !== element && container.contains(element);
+    } :
+    function (element, container) {
+      while (element = element.parentNode) {
+        if (element === container) {
+          return 1;
+        }
+      }
+      return 0;
+    };
+
+  function boilerPlate(selector, _root, fn) {
+    var root = (typeof _root == 'string') ? fn(_root)[0] : (_root || doc);
+    if (isNode(selector)) {
+      return !_root || (isNode(root) && isAncestor(selector, root)) ? [selector] : [];
+    }
+    if (selector && typeof selector === 'object' && isFinite(selector.length)) {
+      return array(selector);
+    }
+    if (m = selector.match(idOnly)) {
+      return (el = doc.getElementById(m[1])) ? [el] : [];
+    }
+    if (m = selector.match(tagOnly)) {
+      return array(root.getElementsByTagName(m[1]));
+    }
+    return false;
+  }
+
+  function isNode(el) {
+    return (el === window || el && el.nodeType && el.nodeType.toString().match(/[19]/));
+  }
+
+  function qsa(selector, _root) {
+    var root = (typeof _root == 'string') ? qsa(_root)[0] : (_root || doc);
+    if (!root || !selector) {
+      return [];
+    }
+    if (m = boilerPlate(selector, _root, qsa)) {
+      return m;
+    }
+    if (doc.getElementsByClassName && (m = selector.match(classOnly))) {
+      return array((root).getElementsByClassName(m[1]));
+    }
+    return array((root).querySelectorAll(selector));
+  }
+
+  function uniq(ar) {
+    var a = [], i, j;
+    label:
+    for (i = 0; i < ar.length; i++) {
+      for (j = 0; j < a.length; j++) {
+        if (a[j] == ar[i]) {
+          continue label;
+        }
+      }
+      a[a.length] = ar[i];
+    }
+    return a;
+  }
+
+  var qwery = function () {
+    // return fast. boosh.
+    if (doc.querySelector && doc.querySelectorAll) {
+      return qsa;
+    }
+    return function (selector, _root) {
+      var root = (typeof _root == 'string') ? qwery(_root)[0] : (_root || doc);
+      if (!root || !selector) {
+        return [];
+      }
+      var i, l, result = [], collections = [], element;
+      if (m = boilerPlate(selector, _root, qwery)) {
+        return m;
+      }
+      if (m = selector.match(tagAndOrClass)) {
+        items = root.getElementsByTagName(m[1] || '*');
+        r = classCache.g(m[2]) || classCache.s(m[2], new RegExp('(^|\\s+)' + m[2] + '(\\s+|$)'));
+        for (i = 0, l = items.length, j = 0; i < l; i++) {
+          r.test(items[i].className) && (result[j++] = items[i]);
+        }
+        return result;
+      }
+      for (i = 0, items = selector.split(','), l = items.length; i < l; i++) {
+        collections[i] = _qwery(items[i]);
+      }
+      for (i = 0, l = collections.length; i < l && (collection = collections[i]); i++) {
+        var ret = collection;
+        if (root !== doc) {
+          ret = [];
+          for (j = 0, m = collection.length; j < m && (element = collection[j]); j++) {
+            // make sure element is a descendent of root
+            isAncestor(element, root) && ret.push(element);
+          }
+        }
+        result = result.concat(ret);
+      }
+      return uniq(result);
+    };
+  }();
+
+  qwery.uniq = uniq;
+  var oldQwery = context.qwery;
+  qwery.noConflict = function () {
+    context.qwery = oldQwery;
+    return this;
+  };
+  context.qwery = qwery;
+
+}(this, document);
+!function (doc) {
+  var q = qwery.noConflict();
+  function create(node, root) {
+    var el = (root || doc).createElement('div'), els = [];
+    el.innerHTML = node;
+    var nodes = el.childNodes;
+    el = el.firstChild;
+    els.push(el);
+    while (el = el.nextSibling) {
+      (el.nodeType == 1) && els.push(el);
+    }
+    return els;
+  };
+  $._select = function (s, r) {
+    return /^\s*</.test(s) ? create(s, r) : q(s, r);
+  };
+  $.ender({
+    find: function (s) {
+      var r = [], i, l, j, k, els;
+      for (i = 0, l = this.length; i < l; i++) {
+        els = q(s, this[i]);
+        for (j = 0, k = els.length; j < k; j++) {
+          r.push(els[j]);
+        }
+      }
+      return $(q.uniq(r));
+    }
+  }, true);
+}(document);
+/*!
+  * bonzo.js - copyright @dedfat 2011
+  * https://github.com/ded/bonzo
+  * Follow our software http://twitter.com/dedfat
+  * MIT License
+  */
+!function (context) {
+
+  var doc = context.document,
+      html = doc.documentElement,
+      query = null,
+      byTag = 'getElementsByTagName',
+      specialAttributes = /^checked|value|selected$/,
+      stateAttributes = /^checked|selected$/,
+      ie = /msie/i.test(navigator.userAgent),
+      uidList = [],
+      uuids = 0,
+      digit = /^-?\d+$/,
+      px = 'px',
+      // commonly used methods
+      setAttribute = 'setAttribute',
+      getAttribute = 'getAttribute',
+      trimReplace = /(^\s*|\s*$)/g,
+      unitless = { lineHeight: 1, zoom: 1, zIndex: 1, opacity: 1 };
+
+  function classReg(c) {
+    return new RegExp("(^|\\s+)" + c + "(\\s+|$)");
+  }
+
+  function each(ar, fn, scope) {
+    for (var i = 0, l = ar.length; i < l; i++) {
+      fn.call(scope || ar[i], ar[i], i, ar);
+    }
+    return ar;
+  }
+
+  var trim = String.prototype.trim ?
+    function (s) {
+      return s.trim();
+    } :
+    function (s) {
+      return s.replace(trimReplace, '');
+    };
+
+  function camelize(s) {
+    return s.replace(/-(.)/g, function (m, m1) {
+      return m1.toUpperCase();
+    });
+  }
+
+  function is(node) {
+    return node && node.nodeName && node.nodeType == 1;
+  }
+
+  function some(ar, fn, scope) {
+    for (var i = 0, j = ar.length; i < j; ++i) {
+      if (fn.call(scope, ar[i], i, ar)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  var getStyle = doc.defaultView && doc.defaultView.getComputedStyle ?
+    function (el, property) {
+      var value = null;
+      if (property == 'float') {
+        property = 'cssFloat';
+      }
+      var computed = doc.defaultView.getComputedStyle(el, '');
+      computed && (value = computed[camelize(property)]);
+      return el.style[property] || value;
+
+    } : (ie && html.currentStyle) ?
+
+    function (el, property) {
+      property = camelize(property);
+      property = property == 'float' ? 'styleFloat' : property;
+
+      if (property == 'opacity') {
+        var val = 100;
+        try {
+          val = el.filters['DXImageTransform.Microsoft.Alpha'].opacity;
+        } catch (e1) {
+          try {
+            val = el.filters('alpha').opacity;
+          } catch (e2) {}
+        }
+        return val / 100;
+      }
+      var value = el.currentStyle ? el.currentStyle[property] : null;
+      return el.style[property] || value;
+    } :
+
+    function (el, property) {
+      return el.style[camelize(property)];
+    };
+
+  function insert(target, host, fn) {
+    var i = 0, self = host || this, r = [];
+    each(normalize(query ? query(target) : target), function (t) {
+      each(self, function (el) {
+        var n = el.cloneNode(true);
+        fn(t, n);
+        r[i] = n;
+        i++;
+      });
+    }, this);
+    each(r, function (e, i) {
+      self[i] = e;
+    });
+    self.length = i;
+    return self;
+  }
+
+  function xy(el, x, y) {
+    var $el = bonzo(el),
+        style = $el.css('position'),
+        offset = $el.offset(),
+        rel = 'relative',
+        isRel = style == rel,
+        delta = [parseInt($el.css('left'), 10), parseInt($el.css('top'), 10)];
+
+    if (style == 'static') {
+      $el.css('position', rel);
+      style = rel;
+    }
+
+    isNaN(delta[0]) && (delta[0] = isRel ? 0 : el.offsetLeft);
+    isNaN(delta[1]) && (delta[1] = isRel ? 0 : el.offsetTop);
+
+    x !== null && (el.style.left = x - offset.left + delta[0] + 'px');
+    y !== null && (el.style.top = y - offset.top + delta[1] + 'px');
+
+  }
+
+  function _bonzo(elements) {
+    this.length = 0;
+    this.original = elements;
+    if (elements) {
+      elements = typeof elements !== 'string' &&
+        !elements.nodeType &&
+        typeof elements.length !== 'undefined' ?
+          elements :
+          [elements];
+      this.length = elements.length;
+      for (var i = 0; i < elements.length; i++) {
+        this[i] = elements[i];
+      }
+    }
+  }
+
+  _bonzo.prototype = {
+
+    each: function (fn, scope) {
+      return each(this, fn, scope);
+    },
+
+    map: function (fn, reject) {
+      var m = [], n;
+      for (var i = 0; i < this.length; i++) {
+        n = fn.call(this, this[i]);
+        reject ? (reject(n) && m.push(n)) : m.push(n);
+      }
+      return m;
+    },
+
+    first: function () {
+      return bonzo(this[0]);
+    },
+
+    last: function () {
+      return bonzo(this[this.length - 1]);
+    },
+
+    html: function (h, text) {
+      var method = text ?
+        html.textContent == null ?
+          'innerText' :
+          'textContent' :
+        'innerHTML';
+      return typeof h !== 'undefined' ?
+        this.each(function (el) {
+          el[method] = h;
+        }) :
+        this[0] ? this[0][method] : '';
+    },
+
+    text: function (text) {
+      return this.html(text, 1);
+    },
+
+    addClass: function (c) {
+      return this.each(function (el) {
+        this.hasClass(el, c) || (el.className = trim(el.className + ' ' + c));
+      }, this);
+    },
+
+    removeClass: function (c) {
+      return this.each(function (el) {
+        this.hasClass(el, c) && (el.className = trim(el.className.replace(classReg(c), ' ')));
+      }, this);
+    },
+
+    hasClass: function (el, c) {
+      return typeof c == 'undefined' ?
+        some(this, function (i) {
+          return classReg(el).test(i.className);
+        }) :
+        classReg(c).test(el.className);
+    },
+
+    toggleClass: function (c, condition) {
+      if (typeof condition !== 'undefined' && !condition) {
+        return this;
+      }
+      return this.each(function (el) {
+        this.hasClass(el, c) ?
+          (el.className = trim(el.className.replace(classReg(c), ' '))) :
+          (el.className = trim(el.className + ' ' + c));
+      }, this);
+    },
+
+    show: function (type) {
+      return this.each(function (el) {
+        el.style.display = type || '';
+      });
+    },
+
+    hide: function (elements) {
+      return this.each(function (el) {
+        el.style.display = 'none';
+      });
+    },
+
+    append: function (node) {
+      return this.each(function (el) {
+        each(normalize(node), function (i) {
+          el.appendChild(i);
+        });
+      });
+    },
+
+    prepend: function (node) {
+      return this.each(function (el) {
+        var first = el.firstChild;
+        each(normalize(node), function (i) {
+          el.insertBefore(i, first);
+        });
+      });
+    },
+
+    appendTo: function (target, host) {
+      return insert.call(this, target, host, function (t, el) {
+        t.appendChild(el);
+      });
+    },
+
+    prependTo: function (target, host) {
+      return insert.call(this, target, host, function (t, el) {
+        t.insertBefore(el, t.firstChild);
+      });
+    },
+
+    next: function () {
+      return this.related('nextSibling');
+    },
+
+    previous: function () {
+      return this.related('previousSibling');
+    },
+
+    related: function (method) {
+      return this.map(
+        function (el) {
+          el = el[method];
+          while (el && el.nodeType !== 1) {
+            el = el[method];
+          }
+          return el || 0;
+        },
+        function (el) {
+          return el;
+        }
+      );
+    },
+
+    before: function (node) {
+      return this.each(function (el) {
+        each(bonzo.create(node), function (i) {
+          el.parentNode.insertBefore(i, el);
+        });
+      });
+    },
+
+    after: function (node) {
+      return this.each(function (el) {
+        each(bonzo.create(node), function (i) {
+          el.parentNode.insertBefore(i, el.nextSibling);
+        });
+      });
+    },
+
+    insertBefore: function (target, host) {
+      return insert.call(this, target, host, function (t, el) {
+        t.parentNode.insertBefore(el, t);
+      });
+    },
+
+    insertAfter: function (target, host) {
+      return insert.call(this, target, host, function (t, el) {
+        t.parentNode.insertBefore(el, (t.nextSibling || t));
+      });
+    },
+
+    css: function (o, v) {
+      // is this a request for just getting a style?
+      if (v === undefined && typeof o == 'string') {
+        return getStyle(this[0], o);
+      }
+      var iter = o;
+      if (typeof o == 'string') {
+        iter = {};
+        iter[o] = v;
+      }
+
+      if (ie && iter.opacity) {
+        // oh this 'ol gamut
+        iter.filter = 'alpha(opacity=' + (iter.opacity * 100) + ')';
+        // give it layout
+        iter.zoom = o.zoom || 1;
+        delete iter.opacity;
+      }
+
+      if (v = iter['float']) {
+        // float is a reserved style word. w3 uses cssFloat, ie uses styleFloat
+        ie ? (iter.styleFloat = v) : (iter.cssFloat = v);
+        delete iter['float'];
+      }
+
+      var fn = function (el, p, v) {
+        for (var k in iter) {
+          if (iter.hasOwnProperty(k)) {
+            v = iter[k];
+            // change "5" to "5px" - unless you're line-height, which is allowed
+            (p = camelize(k)) && digit.test(v) && !(p in unitless) && (v += px);
+            el.style[p] = v;
+          }
+        }
+      };
+      return this.each(fn);
+    },
+
+    offset: function (x, y) {
+      if (x || y) {
+        return this.each(function (el) {
+          xy(el, x, y);
+        });
+      }
+      var el = this[0];
+      var width = el.offsetWidth;
+      var height = el.offsetHeight;
+      var top = el.offsetTop;
+      var left = el.offsetLeft;
+      while (el = el.offsetParent) {
+        top = top + el.offsetTop;
+        left = left + el.offsetLeft;
+      }
+
+      return {
+        top: top,
+        left: left,
+        height: height,
+        width: width
+      };
+    },
+
+    attr: function (k, v) {
+      var el = this[0];
+      return typeof v == 'undefined' ?
+        specialAttributes.test(k) ?
+          stateAttributes.test(k) && typeof el[k] == 'string' ?
+            true : el[k] : el[getAttribute](k) :
+        this.each(function (el) {
+          k == 'value' ? (el.value = v) : el[setAttribute](k, v);
+        });
+    },
+
+    val: function (s) {
+      return (typeof s == 'string') ? this.attr('value', s) : this[0].value;
+    },
+
+    removeAttr: function (k) {
+      return this.each(function (el) {
+        el.removeAttribute(k);
+      });
+    },
+
+    data: function (k, v) {
+      var el = this[0];
+      if (typeof v === 'undefined') {
+        el[getAttribute]('data-node-uid') || el[setAttribute]('data-node-uid', ++uuids);
+        var uid = el[getAttribute]('data-node-uid');
+        uidList[uid] || (uidList[uid] = {});
+        return uidList[uid][k];
+      } else {
+        return this.each(function (el) {
+          el[getAttribute]('data-node-uid') || el[setAttribute]('data-node-uid', ++uuids);
+          var uid = el[getAttribute]('data-node-uid');
+          var o = {};
+          o[k] = v;
+          uidList[uid] = o;
+        });
+      }
+    },
+
+    remove: function () {
+      return this.each(function (el) {
+        el.parentNode && el.parentNode.removeChild(el);
+      });
+    },
+
+    empty: function () {
+      return this.each(function (el) {
+        while (el.firstChild) {
+          el.removeChild(el.firstChild);
+        }
+      });
+    },
+
+    detach: function () {
+      return this.map(function (el) {
+        return el.parentNode.removeChild(el);
+      });
+    },
+
+    scrollTop: function (y) {
+      return scroll.call(this, null, y, 'y');
+    },
+
+    scrollLeft: function (x) {
+      return scroll.call(this, x, null, 'x');
+    }
+  };
+
+  function normalize(node) {
+    return typeof node == 'string' ? bonzo.create(node) : is(node) ? [node] : node;
+  }
+
+  function scroll(x, y, type) {
+    var el = this[0];
+    if (x == null && y == null) {
+      return (isBody(el) ? getWindowScroll() : { x: el.scrollLeft, y: el.scrollTop })[type];
+    }
+    if (isBody(el)) {
+      window.scrollTo(x, y);
+    } else {
+      x != null && (el.scrollLeft = x);
+      y != null && (el.scrollTop = y);
+    }
+    return this;
+  }
+
+  function isBody(element) {
+    return element === window || (/^(?:body|html)$/i).test(element.tagName);
+  }
+
+  function getWindowScroll() {
+    return { x: window.pageXOffset || html.scrollLeft, y: window.pageYOffset || html.scrollTop };
+  }
+
+  function bonzo(els, host) {
+    return new _bonzo(els, host);
+  }
+
+  bonzo.setQueryEngine = function (q) {
+    query = q;
+    delete bonzo.setQueryEngine;
+  };
+
+  bonzo.aug = function (o, target) {
+    for (var k in o) {
+      o.hasOwnProperty(k) && ((target || _bonzo.prototype)[k] = o[k]);
+    }
+  };
+
+  bonzo.create = function (node) {
+    return typeof node == 'string' ?
+      function () {
+        var el = doc.createElement('div'), els = [];
+        el.innerHTML = node;
+        var nodes = el.childNodes;
+        el = el.firstChild;
+        els.push(el);
+        while (el = el.nextSibling) {
+          (el.nodeType == 1) && els.push(el);
+        }
+        return els;
+
+      }() : is(node) ? [node.cloneNode(true)] : [];
+  };
+
+  bonzo.doc = function () {
+    var w = html.scrollWidth,
+        h = html.scrollHeight,
+        vp = this.viewport();
+    return {
+      width: Math.max(w, vp.width),
+      height: Math.max(h, vp.height)
+    };
+  };
+
+  bonzo.firstChild = function (el) {
+    for (var c = el.childNodes, i = 0, j = (c && c.length) || 0, e; i < j; i++) {
+      if (c[i].nodeType === 1) {
+        e = c[j = i];
+      }
+    }
+    return e;
+  };
+
+  bonzo.viewport = function () {
+    var h = self.innerHeight,
+        w = self.innerWidth;
+    ie && (h = html.clientHeight) && (w = html.clientWidth);
+    return {
+      width: w,
+      height: h
+    };
+  };
+
+  bonzo.isAncestor = 'compareDocumentPosition' in html ?
+    function (container, element) {
+      return (container.compareDocumentPosition(element) & 16) == 16;
+    } : 'contains' in html ?
+    function (container, element) {
+      return container !== element && container.contains(element);
+    } :
+    function (container, element) {
+      while (element = element.parentNode) {
+        if (element === container) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+  var old = context.bonzo;
+  bonzo.noConflict = function () {
+    context.bonzo = old;
+    return this;
+  };
+  context['bonzo'] = bonzo;
+
+}(this);!function ($) {
+
+  var b = bonzo;
+  b.setQueryEngine($);
+  $.ender(b);
+  $.ender(b(), true);
+  $.ender({
+    create: function (node) {
+      return $(b.create(node));
+    }
+  });
+
+  function indexOf(ar, val) {
+    for (var i = 0; i < ar.length; i++) {
+      if (ar[i] === val) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  function uniq(ar) {
+    var a = [], i, j;
+    label:
+    for (i = 0; i < ar.length; i++) {
+      for (j = 0; j < a.length; j++) {
+        if (a[j] == ar[i]) {
+          continue label;
+        }
+      }
+      a[a.length] = ar[i];
+    }
+    return a;
+  }
+  $.ender({
+    parents: function (selector, closest) {
+      var collection = $(selector), j, k, p, r = [];
+      for (j = 0, k = this.length; j < k; j++) {
+        p = this[j];
+        while (p = p.parentNode) {
+          if (indexOf(collection, p) !== -1) {
+            r.push(p);
+            if (closest) break;
+          }
+        }
+      }
+      return $(uniq(r));
+    },
+
+    closest: function (selector) {
+      return this.parents(selector, true);
+    },
+
+    first: function () {
+      return $(this[0]);
+    },
+
+    last: function () {
+      return $(this[this.length - 1]);
+    },
+
+    next: function () {
+      return $(b(this).next());
+    },
+
+    previous: function () {
+      return $(b(this).previous());
+    },
+
+    appendTo: function (t) {
+      return b(this.selector).appendTo(t, this);
+    },
+
+    prependTo: function (t) {
+      return b(this.selector).prependTo(t, this);
+    },
+
+    insertAfter: function (t) {
+      return b(this.selector).insertAfter(t, this);
+    },
+
+    insertBefore: function (t) {
+      return b(this.selector).insertBefore(t, this);
+    },
+
+    siblings: function () {
+      var i, l, p, r = [];
+      for (i = 0, l = this.length; i < l; i++) {
+        p = this[i];
+        while (p = p.previousSibling) {
+          p.nodeType == 1 && r.push(p);
+        }
+        p = this[i];
+        while (p = p.nextSibling) {
+          p.nodeType == 1 && r.push(p);
+        }
+      }
+      return $(r);
+    },
+
+    children: function () {
+      var el, r = [];
+      for (i = 0, l = this.length; i < l; i++) {
+        if (!(el = b.firstChild(this[i]))) {
+          continue;
+        }
+        r.push(el);
+        while (el = el.nextSibling) {
+          el.nodeType == 1 && r.push(el);
+        }
+      }
+      return $(uniq(r));
+    },
+
+    height: function (v) {
+      return v ? this.css('height', v) : parseInt(this.css('height'), 10);
+    },
+
+    width: function (v) {
+      return v ? this.css('width', v) : parseInt(this.css('width'), 10);
+    }
+  }, true);
+
+}(ender || $);
+
+/*!
+  * bean.js - copyright @dedfat
+  * https://github.com/fat/bean
+  * Follow our software http://twitter.com/dedfat
+  * MIT License
+  * special thanks to:
+  * dean edwards: http://dean.edwards.name/
+  * dperini: https://github.com/dperini/nwevents
+  * the entire mootools team: github.com/mootools/mootools-core
+  */
+!function (context) {
+  var __uid = 1, registry = {}, collected = {},
+      overOut = /over|out/,
+      namespace = /[^\.]*(?=\..*)\.|.*/,
+      stripName = /\..*/,
+      addEvent = 'addEventListener',
+      attachEvent = 'attachEvent',
+      removeEvent = 'removeEventListener',
+      detachEvent = 'detachEvent',
+      doc = context.document || {},
+      root = doc.documentElement || {},
+      W3C_MODEL = root[addEvent],
+      eventSupport = W3C_MODEL ? addEvent : attachEvent,
+
+  isDescendant = function (parent, child) {
+    var node = child.parentNode;
+    while (node != null) {
+      if (node == parent) {
+        return true;
+      }
+      node = node.parentNode;
+    }
+  },
+
+  retrieveUid = function (obj, uid) {
+    return (obj.__uid = uid || obj.__uid || __uid++);
+  },
+
+  retrieveEvents = function (element) {
+    var uid = retrieveUid(element);
+    return (registry[uid] = registry[uid] || {});
+  },
+
+  listener = W3C_MODEL ? function (element, type, fn, add) {
+    element[add ? addEvent : removeEvent](type, fn, false);
+  } : function (element, type, fn, add, custom) {
+    custom && add && (element['_on' + custom] = element['_on' + custom] || 0);
+    element[add ? attachEvent : detachEvent]('on' + type, fn);
+  },
+
+  nativeHandler = function (element, fn, args) {
+    return function (event) {
+      event = fixEvent(event || ((this.ownerDocument || this.document || this).parentWindow || context).event);
+      return fn.apply(element, [event].concat(args));
+    };
+  },
+
+  customHandler = function (element, fn, type, condition, args) {
+    return function (event) {
+      if (condition ? condition.call(this, event) : W3C_MODEL ? true : event && event.propertyName == '_on' + type || !event) {
+        fn.apply(element, [event].concat(args));
+      }
+    };
+  },
+
+  addListener = function (element, orgType, fn, args) {
+    var type = orgType.replace(stripName, ''),
+        events = retrieveEvents(element),
+        handlers = events[type] || (events[type] = {}),
+        uid = retrieveUid(fn, orgType.replace(namespace, ''));
+    if (handlers[uid]) {
+      return element;
+    }
+    var custom = customEvents[type];
+    if (custom) {
+      fn = custom.condition ? customHandler(element, fn, type, custom.condition) : fn;
+      type = custom.base || type;
+    }
+    var isNative = nativeEvents[type];
+    fn = isNative ? nativeHandler(element, fn, args) : customHandler(element, fn, type, false, args);
+    isNative = W3C_MODEL || isNative;
+    if (type == 'unload') {
+      var org = fn;
+      fn = function () {
+        removeListener(element, type, fn) && org();
+      };
+    }
+    element[eventSupport] && listener(element, isNative ? type : 'propertychange', fn, true, !isNative && type);
+    handlers[uid] = fn;
+    fn.__uid = uid;
+    return type == 'unload' ? element : (collected[retrieveUid(element)] = element);
+  },
+
+  removeListener = function (element, orgType, handler) {
+    var uid, names, uids, i, events = retrieveEvents(element), type = orgType.replace(stripName, '');
+    if (!events || !events[type]) {
+      return element;
+    }
+    names = orgType.replace(namespace, '');
+    uids = names ? names.split('.') : [handler.__uid];
+    for (i = uids.length; i--;) {
+      uid = uids[i];
+      handler = events[type][uid];
+      delete events[type][uid];
+      if (element[eventSupport]) {
+        type = customEvents[type] ? customEvents[type].base : type;
+        var isNative = W3C_MODEL || nativeEvents[type];
+        listener(element, isNative ? type : 'propertychange', handler, false, !isNative && type);
+      }
+    }
+    return element;
+  },
+
+  del = function (selector, fn, $) {
+    return function (e) {
+      var array = typeof selector == 'string' ? $(selector, this) : selector;
+      for (var target = e.target; target && target != this; target = target.parentNode) {
+        for (var i = array.length; i--;) {
+          if (array[i] == target) {
+            return fn.apply(target, arguments);
+          }
+        }
+      }
+    };
+  },
+
+  add = function (element, events, fn, delfn, $) {
+    if (typeof events == 'object' && !fn) {
+      for (var type in events) {
+        events.hasOwnProperty(type) && add(element, type, events[type]);
+      }
+    } else {
+      var isDel = typeof fn == 'string', types = (isDel ? fn : events).split(' ');
+      fn = isDel ? del(events, delfn, $) : fn;
+      for (var i = types.length; i--;) {
+        addListener(element, types[i], fn, Array.prototype.slice.call(arguments, isDel ? 4 : 3));
+      }
+    }
+    return element;
+  },
+
+  remove = function (element, orgEvents, fn) {
+    var k, type, events,
+        isString = typeof(orgEvents) == 'string',
+        names = isString && orgEvents.replace(namespace, ''),
+        rm = removeListener,
+        attached = retrieveEvents(element);
+    if (isString && /\s/.test(orgEvents)) {
+      orgEvents = orgEvents.split(' ');
+      var i = orgEvents.length - 1;
+      while (remove(element, orgEvents[i]) && i--) {}
+      return element;
+    }
+    events = isString ? orgEvents.replace(stripName, '') : orgEvents;
+    if (!attached || (isString && !attached[events])) {
+      return element;
+    }
+    if (typeof fn == 'function') {
+      rm(element, events, fn);
+    } else if (names) {
+      rm(element, orgEvents);
+    } else {
+      rm = events ? rm : remove;
+      type = isString && events;
+      events = events ? (fn || attached[events] || events) : attached;
+      for (k in events) {
+        events.hasOwnProperty(k) && rm(element, type || k, events[k]);
+      }
+    }
+    return element;
+  },
+
+  fire = function (element, type, args) {
+    var evt, k, i, types = type.split(' ');
+    for (i = types.length; i--;) {
+      type = types[i].replace(stripName, '');
+      var isNative = nativeEvents[type],
+          isNamespace = types[i].replace(namespace, ''),
+          handlers = retrieveEvents(element)[type];
+      if (isNamespace) {
+        isNamespace = isNamespace.split('.');
+        for (k = isNamespace.length; k--;) {
+          handlers[isNamespace[k]] && handlers[isNamespace[k]].apply(element, args);
+        }
+      } else if (!args && element[eventSupport]) {
+        fireListener(isNative, type, element);
+      } else {
+        for (k in handlers) {
+          handlers.hasOwnProperty(k) && handlers[k].apply(element, args);
+        }
+      }
+    }
+    return element;
+  },
+
+  fireListener = W3C_MODEL ? function (isNative, type, element) {
+    evt = document.createEvent(isNative ? "HTMLEvents" : "UIEvents");
+    evt[isNative ? 'initEvent' : 'initUIEvent'](type, true, true, context, 1);
+    element.dispatchEvent(evt);
+  } : function (isNative, type, element) {
+    isNative ? element.fireEvent('on' + type, document.createEventObject()) : element['_on' + type]++;
+  },
+
+  clone = function (element, from, type) {
+    var events = retrieveEvents(from), obj, k;
+    obj = type ? events[type] : events;
+    for (k in obj) {
+      obj.hasOwnProperty(k) && (type ? add : clone)(element, type || from, type ? obj[k] : k);
+    }
+    return element;
+  },
+
+  fixEvent = function (e) {
+    var result = {};
+    if (!e) {
+      return result;
+    }
+    var type = e.type, target = e.target || e.srcElement;
+    result.preventDefault = fixEvent.preventDefault(e);
+    result.stopPropagation = fixEvent.stopPropagation(e);
+    result.target = target && target.nodeType == 3 ? target.parentNode : target;
+    if (~type.indexOf('key')) {
+      result.keyCode = e.which || e.keyCode;
+    } else if ((/click|mouse|menu/i).test(type)) {
+      result.rightClick = e.which == 3 || e.button == 2;
+      result.pos = { x: 0, y: 0 };
+      if (e.pageX || e.pageY) {
+        result.clientX = e.pageX;
+        result.clientY = e.pageY;
+      } else if (e.clientX || e.clientY) {
+        result.clientX = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
+        result.clientY = e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
+      }
+      overOut.test(type) && (result.relatedTarget = e.relatedTarget || e[(type == 'mouseover' ? 'from' : 'to') + 'Element']);
+    }
+    for (var k in e) {
+      if (!(k in result)) {
+        result[k] = e[k];
+      }
+    }
+    return result;
+  };
+
+  fixEvent.preventDefault = function (e) {
+    return function () {
+      if (e.preventDefault) {
+        e.preventDefault();
+      }
+      else {
+        e.returnValue = false;
+      }
+    };
+  };
+
+  fixEvent.stopPropagation = function (e) {
+    return function () {
+      if (e.stopPropagation) {
+        e.stopPropagation();
+      } else {
+        e.cancelBubble = true;
+      }
+    };
+  };
+
+  var nativeEvents = { click: 1, dblclick: 1, mouseup: 1, mousedown: 1, contextmenu: 1, //mouse buttons
+    mousewheel: 1, DOMMouseScroll: 1, //mouse wheel
+    mouseover: 1, mouseout: 1, mousemove: 1, selectstart: 1, selectend: 1, //mouse movement
+    keydown: 1, keypress: 1, keyup: 1, //keyboard
+    orientationchange: 1, // mobile
+    touchstart: 1, touchmove: 1, touchend: 1, touchcancel: 1, // touch
+    gesturestart: 1, gesturechange: 1, gestureend: 1, // gesture
+    focus: 1, blur: 1, change: 1, reset: 1, select: 1, submit: 1, //form elements
+    load: 1, unload: 1, beforeunload: 1, resize: 1, move: 1, DOMContentLoaded: 1, readystatechange: 1, //window
+    error: 1, abort: 1, scroll: 1 }; //misc
+
+  function check(event) {
+    var related = event.relatedTarget;
+    if (!related) {
+      return related == null;
+    }
+    return (related != this && related.prefix != 'xul' && !/document/.test(this.toString()) && !isDescendant(this, related));
+  }
+
+  var customEvents = {
+    mouseenter: { base: 'mouseover', condition: check },
+    mouseleave: { base: 'mouseout', condition: check },
+    mousewheel: { base: /Firefox/.test(navigator.userAgent) ? 'DOMMouseScroll' : 'mousewheel' }
+  };
+
+  var bean = { add: add, remove: remove, clone: clone, fire: fire };
+
+  var clean = function (el) {
+    var uid = remove(el).__uid;
+    if (uid) {
+      delete collected[uid];
+      delete registry[uid];
+    }
+  };
+
+  if (context[attachEvent]) {
+    add(context, 'unload', function () {
+      for (var k in collected) {
+        collected.hasOwnProperty(k) && clean(collected[k]);
+      }
+      context.CollectGarbage && CollectGarbage();
+    });
+  }
+
+  var oldBean = context.bean;
+  bean.noConflict = function () {
+    context.bean = oldBean;
+    return this;
+  };
+
+  (typeof module !== 'undefined' && module.exports) ?
+    (module.exports = bean) :
+    (context.bean = bean);
+
+}(this);!function () {
+  var b = bean.noConflict(),
+      integrate = function (method, type, method2) {
+        var _args = type ? [type] : [];
+        return function () {
+          for (var args, i = 0, l = this.length; i < l; i++) {
+            args = [this[i]].concat(_args, Array.prototype.slice.call(arguments, 0));
+            args.length == 4 && args.push($);
+            !arguments.length && method == 'add' && type && (method = 'fire');
+            b[method].apply(this, args);
+          }
+          return this;
+        };
+      };
+
+  var add = integrate('add'),
+      remove = integrate('remove'),
+      fire = integrate('fire');
+
+  var methods = {
+
+    on: add,
+    addListener: add,
+    bind: add,
+    listen: add,
+    delegate: add,
+
+    unbind: remove,
+    unlisten: remove,
+    removeListener: remove,
+    undelegate: remove,
+
+    emit: fire,
+    trigger: fire,
+
+    cloneEvents: integrate('clone'),
+
+    hover: function (enter, leave) {
+      for (var i = 0, l = this.length; i < l; i++) {
+        b.add.call(this, this[i], 'mouseenter', enter);
+        b.add.call(this, this[i], 'mouseleave', leave);
+      }
+      return this;
+    }
+  };
+
+  var shortcuts = [
+    'blur', 'change', 'click', 'dblclick', 'error', 'focus', 'focusin',
+    'focusout', 'keydown', 'keypress', 'keyup', 'load', 'mousedown',
+    'mouseenter', 'mouseleave', 'mouseout', 'mouseover', 'mouseup',
+    'resize', 'scroll', 'select', 'submit', 'unload'
+  ];
+
+  for (var i = shortcuts.length; i--;) {
+    var shortcut = shortcuts[i];
+    methods[shortcut] = integrate('add', shortcut);
+  }
+
+  $.ender(methods, true);
+}();
+
 !function () { var exports = {}, module = { exports: exports }; //     Underscore.js 1.1.6
 //     (c) 2011 Jeremy Ashkenas, DocumentCloud Inc.
 //     Underscore is freely distributable under the MIT license.
@@ -908,2508 +2867,1016 @@
 
 })();
  $.ender(module.exports); }();
-!function () { var exports = {}, module = { exports: exports }; /*
-    http://www.JSON.org/json2.js
-    2011-02-23
-
-    Public Domain.
-
-    NO WARRANTY EXPRESSED OR IMPLIED. USE AT YOUR OWN RISK.
-
-    See http://www.JSON.org/js.html
-
-
-    This code should be minified before deployment.
-    See http://javascript.crockford.com/jsmin.html
-
-    USE YOUR OWN COPY. IT IS EXTREMELY UNWISE TO LOAD CODE FROM SERVERS YOU DO
-    NOT CONTROL.
-
-
-    This file creates a global JSON object containing two methods: stringify
-    and parse.
-
-        JSON.stringify(value, replacer, space)
-            value       any JavaScript value, usually an object or array.
-
-            replacer    an optional parameter that determines how object
-                        values are stringified for objects. It can be a
-                        function or an array of strings.
-
-            space       an optional parameter that specifies the indentation
-                        of nested structures. If it is omitted, the text will
-                        be packed without extra whitespace. If it is a number,
-                        it will specify the number of spaces to indent at each
-                        level. If it is a string (such as '\t' or '&nbsp;'),
-                        it contains the characters used to indent at each level.
-
-            This method produces a JSON text from a JavaScript value.
-
-            When an object value is found, if the object contains a toJSON
-            method, its toJSON method will be called and the result will be
-            stringified. A toJSON method does not serialize: it returns the
-            value represented by the name/value pair that should be serialized,
-            or undefined if nothing should be serialized. The toJSON method
-            will be passed the key associated with the value, and this will be
-            bound to the value
-
-            For example, this would serialize Dates as ISO strings.
-
-                Date.prototype.toJSON = function (key) {
-                    function f(n) {
-                        // Format integers to have at least two digits.
-                        return n < 10 ? '0' + n : n;
-                    }
-
-                    return this.getUTCFullYear()   + '-' +
-                         f(this.getUTCMonth() + 1) + '-' +
-                         f(this.getUTCDate())      + 'T' +
-                         f(this.getUTCHours())     + ':' +
-                         f(this.getUTCMinutes())   + ':' +
-                         f(this.getUTCSeconds())   + 'Z';
-                };
-
-            You can provide an optional replacer method. It will be passed the
-            key and value of each member, with this bound to the containing
-            object. The value that is returned from your method will be
-            serialized. If your method returns undefined, then the member will
-            be excluded from the serialization.
-
-            If the replacer parameter is an array of strings, then it will be
-            used to select the members to be serialized. It filters the results
-            such that only members with keys listed in the replacer array are
-            stringified.
-
-            Values that do not have JSON representations, such as undefined or
-            functions, will not be serialized. Such values in objects will be
-            dropped; in arrays they will be replaced with null. You can use
-            a replacer function to replace those with JSON values.
-            JSON.stringify(undefined) returns undefined.
-
-            The optional space parameter produces a stringification of the
-            value that is filled with line breaks and indentation to make it
-            easier to read.
-
-            If the space parameter is a non-empty string, then that string will
-            be used for indentation. If the space parameter is a number, then
-            the indentation will be that many spaces.
-
-            Example:
-
-            text = JSON.stringify(['e', {pluribus: 'unum'}]);
-            // text is '["e",{"pluribus":"unum"}]'
-
-
-            text = JSON.stringify(['e', {pluribus: 'unum'}], null, '\t');
-            // text is '[\n\t"e",\n\t{\n\t\t"pluribus": "unum"\n\t}\n]'
-
-            text = JSON.stringify([new Date()], function (key, value) {
-                return this[key] instanceof Date ?
-                    'Date(' + this[key] + ')' : value;
-            });
-            // text is '["Date(---current time---)"]'
-
-
-        JSON.parse(text, reviver)
-            This method parses a JSON text to produce an object or array.
-            It can throw a SyntaxError exception.
-
-            The optional reviver parameter is a function that can filter and
-            transform the results. It receives each of the keys and values,
-            and its return value is used instead of the original value.
-            If it returns what it received, then the structure is not modified.
-            If it returns undefined then the member is deleted.
-
-            Example:
-
-            // Parse the text. Values that look like ISO date strings will
-            // be converted to Date objects.
-
-            myData = JSON.parse(text, function (key, value) {
-                var a;
-                if (typeof value === 'string') {
-                    a =
-/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}(?:\.\d*)?)Z$/.exec(value);
-                    if (a) {
-                        return new Date(Date.UTC(+a[1], +a[2] - 1, +a[3], +a[4],
-                            +a[5], +a[6]));
-                    }
-                }
-                return value;
-            });
-
-            myData = JSON.parse('["Date(09/09/2001)"]', function (key, value) {
-                var d;
-                if (typeof value === 'string' &&
-                        value.slice(0, 5) === 'Date(' &&
-                        value.slice(-1) === ')') {
-                    d = new Date(value.slice(5, -1));
-                    if (d) {
-                        return d;
-                    }
-                }
-                return value;
-            });
-
-
-    This is a reference implementation. You are free to copy, modify, or
-    redistribute.
-*/
-
-/*jslint evil: true, strict: false, regexp: false */
-
-/*members "", "\b", "\t", "\n", "\f", "\r", "\"", JSON, "\\", apply,
-    call, charCodeAt, getUTCDate, getUTCFullYear, getUTCHours,
-    getUTCMinutes, getUTCMonth, getUTCSeconds, hasOwnProperty, join,
-    lastIndex, length, parse, prototype, push, replace, slice, stringify,
-    test, toJSON, toString, valueOf
-*/
-
-
-// Create a JSON object only if one does not already exist. We create the
-// methods in a closure to avoid creating global variables.
-
-var JSON;
-if (!JSON) {
-    JSON = {};
-}
-
-(function () {
-    "use strict";
-
-    function f(n) {
-        // Format integers to have at least two digits.
-        return n < 10 ? '0' + n : n;
-    }
-
-    if (typeof Date.prototype.toJSON !== 'function') {
-
-        Date.prototype.toJSON = function (key) {
-
-            return isFinite(this.valueOf()) ?
-                this.getUTCFullYear()     + '-' +
-                f(this.getUTCMonth() + 1) + '-' +
-                f(this.getUTCDate())      + 'T' +
-                f(this.getUTCHours())     + ':' +
-                f(this.getUTCMinutes())   + ':' +
-                f(this.getUTCSeconds())   + 'Z' : null;
-        };
-
-        String.prototype.toJSON      =
-            Number.prototype.toJSON  =
-            Boolean.prototype.toJSON = function (key) {
-                return this.valueOf();
-            };
-    }
-
-    var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
-        escapable = /[\\\"\x00-\x1f\x7f-\x9f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
-        gap,
-        indent,
-        meta = {    // table of character substitutions
-            '\b': '\\b',
-            '\t': '\\t',
-            '\n': '\\n',
-            '\f': '\\f',
-            '\r': '\\r',
-            '"' : '\\"',
-            '\\': '\\\\'
-        },
-        rep;
-
-
-    function quote(string) {
-
-// If the string contains no control characters, no quote characters, and no
-// backslash characters, then we can safely slap some quotes around it.
-// Otherwise we must also replace the offending characters with safe escape
-// sequences.
-
-        escapable.lastIndex = 0;
-        return escapable.test(string) ? '"' + string.replace(escapable, function (a) {
-            var c = meta[a];
-            return typeof c === 'string' ? c :
-                '\\u' + ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
-        }) + '"' : '"' + string + '"';
-    }
-
-
-    function str(key, holder) {
-
-// Produce a string from holder[key].
-
-        var i,          // The loop counter.
-            k,          // The member key.
-            v,          // The member value.
-            length,
-            mind = gap,
-            partial,
-            value = holder[key];
-
-// If the value has a toJSON method, call it to obtain a replacement value.
-
-        if (value && typeof value === 'object' &&
-                typeof value.toJSON === 'function') {
-            value = value.toJSON(key);
-        }
-
-// If we were called with a replacer function, then call the replacer to
-// obtain a replacement value.
-
-        if (typeof rep === 'function') {
-            value = rep.call(holder, key, value);
-        }
-
-// What happens next depends on the value's type.
-
-        switch (typeof value) {
-        case 'string':
-            return quote(value);
-
-        case 'number':
-
-// JSON numbers must be finite. Encode non-finite numbers as null.
-
-            return isFinite(value) ? String(value) : 'null';
-
-        case 'boolean':
-        case 'null':
-
-// If the value is a boolean or null, convert it to a string. Note:
-// typeof null does not produce 'null'. The case is included here in
-// the remote chance that this gets fixed someday.
-
-            return String(value);
-
-// If the type is 'object', we might be dealing with an object or an array or
-// null.
-
-        case 'object':
-
-// Due to a specification blunder in ECMAScript, typeof null is 'object',
-// so watch out for that case.
-
-            if (!value) {
-                return 'null';
-            }
-
-// Make an array to hold the partial results of stringifying this object value.
-
-            gap += indent;
-            partial = [];
-
-// Is the value an array?
-
-            if (Object.prototype.toString.apply(value) === '[object Array]') {
-
-// The value is an array. Stringify every element. Use null as a placeholder
-// for non-JSON values.
-
-                length = value.length;
-                for (i = 0; i < length; i += 1) {
-                    partial[i] = str(i, value) || 'null';
-                }
-
-// Join all of the elements together, separated with commas, and wrap them in
-// brackets.
-
-                v = partial.length === 0 ? '[]' : gap ?
-                    '[\n' + gap + partial.join(',\n' + gap) + '\n' + mind + ']' :
-                    '[' + partial.join(',') + ']';
-                gap = mind;
-                return v;
-            }
-
-// If the replacer is an array, use it to select the members to be stringified.
-
-            if (rep && typeof rep === 'object') {
-                length = rep.length;
-                for (i = 0; i < length; i += 1) {
-                    if (typeof rep[i] === 'string') {
-                        k = rep[i];
-                        v = str(k, value);
-                        if (v) {
-                            partial.push(quote(k) + (gap ? ': ' : ':') + v);
-                        }
-                    }
-                }
-            } else {
-
-// Otherwise, iterate through all of the keys in the object.
-
-                for (k in value) {
-                    if (Object.prototype.hasOwnProperty.call(value, k)) {
-                        v = str(k, value);
-                        if (v) {
-                            partial.push(quote(k) + (gap ? ': ' : ':') + v);
-                        }
-                    }
-                }
-            }
-
-// Join all of the member texts together, separated with commas,
-// and wrap them in braces.
-
-            v = partial.length === 0 ? '{}' : gap ?
-                '{\n' + gap + partial.join(',\n' + gap) + '\n' + mind + '}' :
-                '{' + partial.join(',') + '}';
-            gap = mind;
-            return v;
-        }
-    }
-
-// If the JSON object does not yet have a stringify method, give it one.
-
-    if (typeof JSON.stringify !== 'function') {
-        JSON.stringify = function (value, replacer, space) {
-
-// The stringify method takes a value and an optional replacer, and an optional
-// space parameter, and returns a JSON text. The replacer can be a function
-// that can replace values, or an array of strings that will select the keys.
-// A default replacer method can be provided. Use of the space parameter can
-// produce text that is more easily readable.
-
-            var i;
-            gap = '';
-            indent = '';
-
-// If the space parameter is a number, make an indent string containing that
-// many spaces.
-
-            if (typeof space === 'number') {
-                for (i = 0; i < space; i += 1) {
-                    indent += ' ';
-                }
-
-// If the space parameter is a string, it will be used as the indent string.
-
-            } else if (typeof space === 'string') {
-                indent = space;
-            }
-
-// If there is a replacer, it must be a function or an array.
-// Otherwise, throw an error.
-
-            rep = replacer;
-            if (replacer && typeof replacer !== 'function' &&
-                    (typeof replacer !== 'object' ||
-                    typeof replacer.length !== 'number')) {
-                throw new Error('JSON.stringify');
-            }
-
-// Make a fake root object containing our value under the key of ''.
-// Return the result of stringifying the value.
-
-            return str('', {'': value});
-        };
-    }
-
-
-// If the JSON object does not yet have a parse method, give it one.
-
-    if (typeof JSON.parse !== 'function') {
-        JSON.parse = function (text, reviver) {
-
-// The parse method takes a text and an optional reviver function, and returns
-// a JavaScript value if the text is a valid JSON text.
-
-            var j;
-
-            function walk(holder, key) {
-
-// The walk method is used to recursively walk the resulting structure so
-// that modifications can be made.
-
-                var k, v, value = holder[key];
-                if (value && typeof value === 'object') {
-                    for (k in value) {
-                        if (Object.prototype.hasOwnProperty.call(value, k)) {
-                            v = walk(value, k);
-                            if (v !== undefined) {
-                                value[k] = v;
-                            } else {
-                                delete value[k];
-                            }
-                        }
-                    }
-                }
-                return reviver.call(holder, key, value);
-            }
-
-
-// Parsing happens in four stages. In the first stage, we replace certain
-// Unicode characters with escape sequences. JavaScript handles many characters
-// incorrectly, either silently deleting them, or treating them as line endings.
-
-            text = String(text);
-            cx.lastIndex = 0;
-            if (cx.test(text)) {
-                text = text.replace(cx, function (a) {
-                    return '\\u' +
-                        ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
-                });
-            }
-
-// In the second stage, we run the text against regular expressions that look
-// for non-JSON patterns. We are especially concerned with '()' and 'new'
-// because they can cause invocation, and '=' because it can cause mutation.
-// But just to be safe, we want to reject all unexpected forms.
-
-// We split the second stage into 4 regexp operations in order to work around
-// crippling inefficiencies in IE's and Safari's regexp engines. First we
-// replace the JSON backslash pairs with '@' (a non-JSON character). Second, we
-// replace all simple value tokens with ']' characters. Third, we delete all
-// open brackets that follow a colon or comma or that begin the text. Finally,
-// we look to see that the remaining characters are only whitespace or ']' or
-// ',' or ':' or '{' or '}'. If that is so, then the text is safe for eval.
-
-            if (/^[\],:{}\s]*$/
-                    .test(text.replace(/\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g, '@')
-                        .replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, ']')
-                        .replace(/(?:^|:|,)(?:\s*\[)+/g, ''))) {
-
-// In the third stage we use the eval function to compile the text into a
-// JavaScript structure. The '{' operator is subject to a syntactic ambiguity
-// in JavaScript: it can begin a block or an object literal. We wrap the text
-// in parens to eliminate the ambiguity.
-
-                j = eval('(' + text + ')');
-
-// In the optional fourth stage, we recursively walk the new structure, passing
-// each name/value pair to a reviver function for possible transformation.
-
-                return typeof reviver === 'function' ?
-                    walk({'': j}, '') : j;
-            }
-
-// If the text is not JSON parseable, then a SyntaxError is thrown.
-
-            throw new SyntaxError('JSON.parse');
-        };
-    }
-}());
-
-// shim IE<8 and FF with buggy stringifier
-if (!this.JSON || typeof this.JSON !== 'function' || !~this.JSON.stringify({date:new Date(2011,4,6,10,10)},function(k,v){if(k==='date')return String('SERIALIZED');return v;}).indexOf('SERIALIZED')) {
-  this.JSON = JSON;
-}
-}();
-/**
-  * Klass.js - copyright @dedfat
-  * version 1.0
-  * https://github.com/ded/klass
-  * Follow our software http://twitter.com/dedfat :)
-  * MIT License
-  */
-!function (context, f) {
-  var fnTest = /xyz/.test(function () {
-    xyz;
-    }) ? /\bsupr\b/ : /.*/,
-      noop = function (){},
-      proto = 'prototype',
-      isFn = function (o) {
-        return typeof o === f;
-      };
-
-  function klass(o) {
-    return extend.call(typeof o == f ? o : noop, o, 1);
-  }
-
-  function wrap(k, fn, supr) {
-    return function () {
-      var tmp = this.supr;
-      this.supr = supr[proto][k];
-      var ret = fn.apply(this, arguments);
-      this.supr = tmp;
-      return ret;
-    };
-  }
-
-  function process(what, o, supr) {
-    for (var k in o) {
-      if (o.hasOwnProperty(k)) {
-        what[k] = typeof o[k] == f
-          && typeof supr[proto][k] == f
-          && fnTest.test(o[k])
-          ? wrap(k, o[k], supr) : o[k];
-      }
-    }
-  }
-
-  function extend(o, fromSub) {
-    noop[proto] = this[proto];
-    var supr = this,
-        prototype = new noop(),
-        isFunction = typeof o == f,
-        _constructor = isFunction ? o : this,
-        _methods = isFunction ? {} : o,
-        fn = function () {
-          if (this.initialize) {
-            this.initialize.apply(this, arguments);
-          } else {
-            fromSub || isFn(o) && supr.apply(this, arguments);
-            _constructor.apply(this, arguments);
-          }
-        };
-
-    fn.methods = function (o) {
-      process(prototype, o, supr);
-      fn[proto] = prototype;
-      return this;
-    };
-
-    fn.methods.call(fn, _methods).prototype.constructor = fn;
-
-    fn.extend = arguments.callee;
-    fn[proto].implement = fn.statics = function (o, optFn) {
-      o = typeof o == 'string' ? (function () {
-        var obj = {};
-        obj[o] = optFn;
-        return obj;
-      }()) : o;
-      process(this, o, supr);
-      return this;
-    };
-
-    return fn;
-  }
-
-  if (typeof module !== 'undefined' && module.exports) {
-    module.exports = klass;
+!function () { var exports = {}, module = { exports: exports }; //     Backbone.js 0.3.3
+//     (c) 2010 Jeremy Ashkenas, DocumentCloud Inc.
+//     Backbone may be freely distributed under the MIT license.
+//     For all details and documentation:
+//     http://documentcloud.github.com/backbone
+
+(function(){
+
+  // Initial Setup
+  // -------------
+
+  // The top-level namespace. All public Backbone classes and modules will
+  // be attached to this. Exported for both CommonJS and the browser.
+  var Backbone;
+  if (typeof exports !== 'undefined') {
+    Backbone = exports;
   } else {
-    var old = context.klass;
-    klass.noConflict = function () {
-      context.klass = old;
+    Backbone = this.Backbone = {};
+  }
+
+  // Current version of the library. Keep in sync with `package.json`.
+  Backbone.VERSION = '0.3.3';
+
+  // Require Underscore, if we're on the server, and it's not already present.
+  var _ = this._;
+  if (!_ && (typeof require !== 'undefined')) _ = require("underscore")._;
+
+  // For Backbone's purposes, either jQuery or Zepto owns the `$` variable.
+  var $ = this.jQuery || this.Zepto;
+  if (this.ender) _ = $ = this.ender;
+
+  // Turn on `emulateHTTP` to use support legacy HTTP servers. Setting this option will
+  // fake `"PUT"` and `"DELETE"` requests via the `_method` parameter and set a
+  // `X-Http-Method-Override` header.
+  Backbone.emulateHTTP = false;
+
+  // Turn on `emulateJSON` to support legacy servers that can't deal with direct
+  // `application/json` requests ... will encode the body as
+  // `application/x-www-form-urlencoded` instead and will send the model in a
+  // form param named `model`.
+  Backbone.emulateJSON = false;
+
+  // Backbone.Events
+  // -----------------
+
+  // A module that can be mixed in to *any object* in order to provide it with
+  // custom events. You may `bind` or `unbind` a callback function to an event;
+  // `trigger`-ing an event fires all callbacks in succession.
+  //
+  //     var object = {};
+  //     _.extend(object, Backbone.Events);
+  //     object.bind('expand', function(){ alert('expanded'); });
+  //     object.trigger('expand');
+  //
+  Backbone.Events = {
+
+    // Bind an event, specified by a string name, `ev`, to a `callback` function.
+    // Passing `"all"` will bind the callback to all events fired.
+    bind : function(ev, callback) {
+      var calls = this._callbacks || (this._callbacks = {});
+      var list  = this._callbacks[ev] || (this._callbacks[ev] = []);
+      list.push(callback);
       return this;
-    };
-    context.klass = klass;
-  }
+    },
 
-}(this, 'function');$.ender({
-  klass: klass.noConflict()
-});
-/*!
-  * $script.js v1.3
-  * https://github.com/ded/script.js
-  * Copyright: @ded & @fat - Dustin Diaz, Jacob Thornton 2011
-  * Follow our software http://twitter.com/dedfat
-  * License: MIT
-  */
-!function(win, doc, timeout) {
-  var script = doc.getElementsByTagName("script")[0],
-      list = {}, ids = {}, delay = {}, re = /^i|c/,
-      scripts = {}, s = 'string', f = false,
-      push = 'push', domContentLoaded = 'DOMContentLoaded', readyState = 'readyState',
-      addEventListener = 'addEventListener', onreadystatechange = 'onreadystatechange',
-      every = function(ar, fn) {
-        for (var i = 0, j = ar.length; i < j; ++i) {
-          if (!fn(ar[i])) {
-            return 0;
-          }
-        }
-        return 1;
-      };
-      function each(ar, fn) {
-        every(ar, function(el) {
-          return !fn(el);
-        });
-      }
-
-  if (!doc[readyState] && doc[addEventListener]) {
-    doc[addEventListener](domContentLoaded, function fn() {
-      doc.removeEventListener(domContentLoaded, fn, f);
-      doc[readyState] = "complete";
-    }, f);
-    doc[readyState] = "loading";
-  }
-
-  var $script = function(paths, idOrDone, optDone) {
-    paths = paths[push] ? paths : [paths];
-    var idOrDoneIsDone = idOrDone && idOrDone.call,
-        done = idOrDoneIsDone ? idOrDone : optDone,
-        id = idOrDoneIsDone ? paths.join('') : idOrDone,
-        queue = paths.length;
-        function loopFn(item) {
-          return item.call ? item() : list[item];
-        }
-        function callback() {
-          if (!--queue) {
-            list[id] = 1;
-            done && done();
-            for (var dset in delay) {
-              every(dset.split('|'), loopFn) && !each(delay[dset], loopFn) && (delay[dset] = []);
+    // Remove one or many callbacks. If `callback` is null, removes all
+    // callbacks for the event. If `ev` is null, removes all bound callbacks
+    // for all events.
+    unbind : function(ev, callback) {
+      var calls;
+      if (!ev) {
+        this._callbacks = {};
+      } else if (calls = this._callbacks) {
+        if (!callback) {
+          calls[ev] = [];
+        } else {
+          var list = calls[ev];
+          if (!list) return this;
+          for (var i = 0, l = list.length; i < l; i++) {
+            if (callback === list[i]) {
+              list.splice(i, 1);
+              break;
             }
           }
         }
-    timeout(function() {
-      each(paths, function(path) {
-        if (scripts[path]) {
-          id && (ids[id] = 1);
-          callback();
-          return;
-        }
-        scripts[path] = 1;
-        id && (ids[id] = 1);
-        create($script.path ?
-          $script.path + path + '.js' :
-          path, callback);
-      });
-    }, 0);
-    return $script;
-  };
-
-  function create(path, fn) {
-    var el = doc.createElement("script"),
-        loaded = 0;
-    el.onload = el[onreadystatechange] = function () {
-      if ((el[readyState] && !(!re.test(el[readyState]))) || loaded) {
-        return;
       }
-      el.onload = el[onreadystatechange] = null;
-      loaded = 1;
-      fn();
-    };
-    el.async = 1;
-    el.src = path;
-    script.parentNode.insertBefore(el, script);
-  }
+      return this;
+    },
 
-  $script.get = create;
+    // Trigger an event, firing all bound callbacks. Callbacks are passed the
+    // same arguments as `trigger` is, apart from the event name.
+    // Listening for `"all"` passes the true event name as the first argument.
+    trigger : function(ev) {
+      var list, calls, i, l;
+      if (!(calls = this._callbacks)) return this;
+      if (list = calls[ev]) {
+        for (i = 0, l = list.length; i < l; i++) {
+          list[i].apply(this, Array.prototype.slice.call(arguments, 1));
+        }
+      }
+      if (list = calls['all']) {
+        for (i = 0, l = list.length; i < l; i++) {
+          list[i].apply(this, arguments);
+        }
+      }
+      return this;
+    }
 
-  $script.ready = function(deps, ready, req) {
-    deps = deps[push] ? deps : [deps];
-    var missing = [];
-    !each(deps, function(dep) {
-      list[dep] || missing[push](dep);
-    }) && every(deps, function(dep) {
-      return list[dep];
-    }) ? ready() : !function(key) {
-      delay[key] = delay[key] || [];
-      delay[key][push](ready);
-      req && req(missing);
-    }(deps.join('|'));
-    return $script;
   };
 
-  var old = win.$script;
-  $script.noConflict = function () {
-    win.$script = old;
-    return this;
+  // Backbone.Model
+  // --------------
+
+  // Create a new model, with defined attributes. A client id (`cid`)
+  // is automatically generated and assigned for you.
+  Backbone.Model = function(attributes, options) {
+    attributes || (attributes = {});
+    if (this.defaults) attributes = _.extend({}, this.defaults, attributes);
+    this.attributes = {};
+    this._escapedAttributes = {};
+    this.cid = _.uniqueId('c');
+    this.set(attributes, {silent : true});
+    this._previousAttributes = _.clone(this.attributes);
+    if (options && options.collection) this.collection = options.collection;
+    this.initialize(attributes, options);
   };
 
-  (typeof module !== 'undefined' && module.exports) ?
-    (module.exports = $script) :
-    (win.$script = $script);
+  // Attach all inheritable methods to the Model prototype.
+  _.extend(Backbone.Model.prototype, Backbone.Events, {
 
-}(this, document, setTimeout);
-!function () {
-  var s = $script.noConflict();
-  $.ender({
-    script: s,
-    ready: s.ready,
-    require: s,
-    getScript: s.get
+    // A snapshot of the model's previous attributes, taken immediately
+    // after the last `"change"` event was fired.
+    _previousAttributes : null,
+
+    // Has the item been changed since the last `"change"` event?
+    _changed : false,
+
+    // Initialize is an empty function by default. Override it with your own
+    // initialization logic.
+    initialize : function(){},
+
+    // Return a copy of the model's `attributes` object.
+    toJSON : function() {
+      return _.clone(this.attributes);
+    },
+
+    // Get the value of an attribute.
+    get : function(attr) {
+      return this.attributes[attr];
+    },
+
+    // Get the HTML-escaped value of an attribute.
+    escape : function(attr) {
+      var html;
+      if (html = this._escapedAttributes[attr]) return html;
+      var val = this.attributes[attr];
+      return this._escapedAttributes[attr] = escapeHTML(val == null ? '' : val);
+    },
+
+    // Set a hash of model attributes on the object, firing `"change"` unless you
+    // choose to silence it.
+    set : function(attrs, options) {
+
+      // Extract attributes and options.
+      options || (options = {});
+      if (!attrs) return this;
+      if (attrs.attributes) attrs = attrs.attributes;
+      var now = this.attributes, escaped = this._escapedAttributes;
+
+      // Run validation.
+      if (!options.silent && this.validate && !this._performValidation(attrs, options)) return false;
+
+      // Check for changes of `id`.
+      if ('id' in attrs) this.id = attrs.id;
+
+      // Update attributes.
+      for (var attr in attrs) {
+        var val = attrs[attr];
+        if (!_.isEqual(now[attr], val)) {
+          now[attr] = val;
+          delete escaped[attr];
+          if (!options.silent) {
+            this._changed = true;
+            this.trigger('change:' + attr, this, val, options);
+          }
+        }
+      }
+
+      // Fire the `"change"` event, if the model has been changed.
+      if (!options.silent && this._changed) this.change(options);
+      return this;
+    },
+
+    // Remove an attribute from the model, firing `"change"` unless you choose
+    // to silence it.
+    unset : function(attr, options) {
+      options || (options = {});
+      var value = this.attributes[attr];
+
+      // Run validation.
+      var validObj = {};
+      validObj[attr] = void 0;
+      if (!options.silent && this.validate && !this._performValidation(validObj, options)) return false;
+
+      // Remove the attribute.
+      delete this.attributes[attr];
+      delete this._escapedAttributes[attr];
+      if (!options.silent) {
+        this._changed = true;
+        this.trigger('change:' + attr, this, void 0, options);
+        this.change(options);
+      }
+      return this;
+    },
+
+    // Clear all attributes on the model, firing `"change"` unless you choose
+    // to silence it.
+    clear : function(options) {
+      options || (options = {});
+      var old = this.attributes;
+
+      // Run validation.
+      var validObj = {};
+      for (attr in old) validObj[attr] = void 0;
+      if (!options.silent && this.validate && !this._performValidation(validObj, options)) return false;
+
+      this.attributes = {};
+      this._escapedAttributes = {};
+      if (!options.silent) {
+        this._changed = true;
+        for (attr in old) {
+          this.trigger('change:' + attr, this, void 0, options);
+        }
+        this.change(options);
+      }
+      return this;
+    },
+
+    // Fetch the model from the server. If the server's representation of the
+    // model differs from its current attributes, they will be overriden,
+    // triggering a `"change"` event.
+    fetch : function(options) {
+      options || (options = {});
+      var model = this;
+      var success = function(resp) {
+        if (!model.set(model.parse(resp), options)) return false;
+        if (options.success) options.success(model, resp);
+      };
+      var error = wrapError(options.error, model, options);
+      (this.sync || Backbone.sync)('read', this, success, error);
+      return this;
+    },
+
+    // Set a hash of model attributes, and sync the model to the server.
+    // If the server returns an attributes hash that differs, the model's
+    // state will be `set` again.
+    save : function(attrs, options) {
+      options || (options = {});
+      if (attrs && !this.set(attrs, options)) return false;
+      var model = this;
+      var success = function(resp) {
+        if (!model.set(model.parse(resp), options)) return false;
+        if (options.success) options.success(model, resp);
+      };
+      var error = wrapError(options.error, model, options);
+      var method = this.isNew() ? 'create' : 'update';
+      (this.sync || Backbone.sync)(method, this, success, error);
+      return this;
+    },
+
+    // Destroy this model on the server. Upon success, the model is removed
+    // from its collection, if it has one.
+    destroy : function(options) {
+      options || (options = {});
+      var model = this;
+      var success = function(resp) {
+        if (model.collection) model.collection.remove(model);
+        if (options.success) options.success(model, resp);
+      };
+      var error = wrapError(options.error, model, options);
+      (this.sync || Backbone.sync)('delete', this, success, error);
+      return this;
+    },
+
+    // Default URL for the model's representation on the server -- if you're
+    // using Backbone's restful methods, override this to change the endpoint
+    // that will be called.
+    url : function() {
+      var base = getUrl(this.collection);
+      if (this.isNew()) return base;
+      return base + (base.charAt(base.length - 1) == '/' ? '' : '/') + this.id;
+    },
+
+    // **parse** converts a response into the hash of attributes to be `set` on
+    // the model. The default implementation is just to pass the response along.
+    parse : function(resp) {
+      return resp;
+    },
+
+    // Create a new model with identical attributes to this one.
+    clone : function() {
+      return new this.constructor(this);
+    },
+
+    // A model is new if it has never been saved to the server, and has a negative
+    // ID.
+    isNew : function() {
+      return !this.id;
+    },
+
+    // Call this method to manually fire a `change` event for this model.
+    // Calling this will cause all objects observing the model to update.
+    change : function(options) {
+      this.trigger('change', this, options);
+      this._previousAttributes = _.clone(this.attributes);
+      this._changed = false;
+    },
+
+    // Determine if the model has changed since the last `"change"` event.
+    // If you specify an attribute name, determine if that attribute has changed.
+    hasChanged : function(attr) {
+      if (attr) return this._previousAttributes[attr] != this.attributes[attr];
+      return this._changed;
+    },
+
+    // Return an object containing all the attributes that have changed, or false
+    // if there are no changed attributes. Useful for determining what parts of a
+    // view need to be updated and/or what attributes need to be persisted to
+    // the server.
+    changedAttributes : function(now) {
+      now || (now = this.attributes);
+      var old = this._previousAttributes;
+      var changed = false;
+      for (var attr in now) {
+        if (!_.isEqual(old[attr], now[attr])) {
+          changed = changed || {};
+          changed[attr] = now[attr];
+        }
+      }
+      return changed;
+    },
+
+    // Get the previous value of an attribute, recorded at the time the last
+    // `"change"` event was fired.
+    previous : function(attr) {
+      if (!attr || !this._previousAttributes) return null;
+      return this._previousAttributes[attr];
+    },
+
+    // Get all of the attributes of the model at the time of the previous
+    // `"change"` event.
+    previousAttributes : function() {
+      return _.clone(this._previousAttributes);
+    },
+
+    // Run validation against a set of incoming attributes, returning `true`
+    // if all is well. If a specific `error` callback has been passed,
+    // call that instead of firing the general `"error"` event.
+    _performValidation : function(attrs, options) {
+      var error = this.validate(attrs);
+      if (error) {
+        if (options.error) {
+          options.error(this, error);
+        } else {
+          this.trigger('error', this, error, options);
+        }
+        return false;
+      }
+      return true;
+    }
+
   });
-}();
-/*!
-  * qwery.js - copyright @dedfat
-  * https://github.com/ded/qwery
-  * Follow our software http://twitter.com/dedfat
-  * MIT License
-  */
-!function (context, doc) {
 
-  var c, i, j, k, l, m, o, p, r, v,
-      el, node, len, found, classes, item, items, token, collection,
-      id = /#([\w\-]+)/,
-      clas = /\.[\w\-]+/g,
-      idOnly = /^#([\w\-]+$)/,
-      classOnly = /^\.([\w\-]+)$/,
-      tagOnly = /^([\w\-]+)$/,
-      tagAndOrClass = /^([\w]+)?\.([\w\-]+)$/,
-      html = doc.documentElement,
-      tokenizr = /\s(?![\s\w\-\/\?\&\=\:\.\(\)\!,@#%<>\{\}\$\*\^'"]*\])/,
-      simple = /^([a-z0-9]+)?(?:([\.\#]+[\w\-\.#]+)?)/,
-      attr = /\[([\w\-]+)(?:([\|\^\$\*\~]?\=)['"]?([ \w\-\/\?\&\=\:\.\(\)\!,@#%<>\{\}\$\*\^]+)["']?)?\]/,
-      chunker = new RegExp(simple.source + '(' + attr.source + ')?');
+  // Backbone.Collection
+  // -------------------
 
-  function array(ar) {
-    r = [];
-    for (i = 0, len = ar.length; i < len; i++) {
-      r[i] = ar[i];
+  // Provides a standard collection class for our sets of models, ordered
+  // or unordered. If a `comparator` is specified, the Collection will maintain
+  // its models in sort order, as they're added and removed.
+  Backbone.Collection = function(models, options) {
+    options || (options = {});
+    if (options.comparator) {
+      this.comparator = options.comparator;
+      delete options.comparator;
     }
-    return r;
-  }
-
-  var cache = function () {
-    this.c = {};
-  };
-  cache.prototype = {
-    g: function (k) {
-      return this.c[k] || undefined;
-    },
-    s: function (k, v) {
-      this.c[k] = v;
-      return v;
-    }
+    this._boundOnModelEvent = _.bind(this._onModelEvent, this);
+    this._reset();
+    if (models) this.refresh(models, {silent: true});
+    this.initialize(models, options);
   };
 
-  var classCache = new cache(),
-      cleanCache = new cache(),
-      attrCache = new cache(),
-      tokenCache = new cache();
+  // Define the Collection's inheritable methods.
+  _.extend(Backbone.Collection.prototype, Backbone.Events, {
 
-  function q(query) {
-    return query.match(chunker);
-  }
+    // The default model for a collection is just a **Backbone.Model**.
+    // This should be overridden in most cases.
+    model : Backbone.Model,
 
-  function interpret(whole, tag, idsAndClasses, wholeAttribute, attribute, qualifier, value) {
-    var m, c, k;
-    if (tag && this.tagName.toLowerCase() !== tag) {
-      return false;
-    }
-    if (idsAndClasses && (m = idsAndClasses.match(id)) && m[1] !== this.id) {
-      return false;
-    }
-    if (idsAndClasses && (classes = idsAndClasses.match(clas))) {
-      for (i = classes.length; i--;) {
-        c = classes[i].slice(1);
-        if (!(classCache.g(c) || classCache.s(c, new RegExp('(^|\\s+)' + c + '(\\s+|$)'))).test(this.className)) {
-          return false;
+    // Initialize is an empty function by default. Override it with your own
+    // initialization logic.
+    initialize : function(){},
+
+    // The JSON representation of a Collection is an array of the
+    // models' attributes.
+    toJSON : function() {
+      return this.map(function(model){ return model.toJSON(); });
+    },
+
+    // Add a model, or list of models to the set. Pass **silent** to avoid
+    // firing the `added` event for every new model.
+    add : function(models, options) {
+      if (_.isArray(models)) {
+        for (var i = 0, l = models.length; i < l; i++) {
+          this._add(models[i], options);
         }
-      }
-    }
-    if (wholeAttribute && !value) {
-      o = this.attributes;
-      for (k in o) {
-        if (Object.prototype.hasOwnProperty.call(o, k) && (o[k].name || k) == attribute) {
-          return this;
-        }
-      }
-    }
-    if (wholeAttribute && !checkAttr(qualifier, this.getAttribute(attribute) || '', value)) {
-      return false;
-    }
-    return this;
-  }
-
-  function loopAll(tokens) {
-    var r = [], token = tokens.pop(), intr = q(token), tag = intr[1] || '*', i, l, els,
-        root = tokens.length && (m = tokens[0].match(idOnly)) ? doc.getElementById(m[1]) : doc;
-    if (!root) {
-      return r;
-    }
-    els = root.getElementsByTagName(tag);
-    for (i = 0, l = els.length; i < l; i++) {
-      el = els[i];
-      if (item = interpret.apply(el, intr)) {
-        r.push(item);
-      }
-    }
-    return r;
-  }
-
-  function clean(s) {
-    return cleanCache.g(s) || cleanCache.s(s, s.replace(/([.*+?\^=!:${}()|\[\]\/\\])/g, '\\$1'));
-  }
-
-  function checkAttr(qualify, actual, val) {
-    switch (qualify) {
-    case '=':
-      return actual == val;
-    case '^=':
-      return actual.match(attrCache.g('^=' + val) || attrCache.s('^=' + val, new RegExp('^' + clean(val))));
-    case '$=':
-      return actual.match(attrCache.g('$=' + val) || attrCache.s('$=' + val, new RegExp(clean(val) + '$')));
-    case '*=':
-      return actual.match(attrCache.g(val) || attrCache.s(val, new RegExp(clean(val))));
-    case '~=':
-      return actual.match(attrCache.g('~=' + val) || attrCache.s('~=' + val, new RegExp('(?:^|\\s+)' + clean(val) + '(?:\\s+|$)')));
-    case '|=':
-      return actual.match(attrCache.g('|=' + val) || attrCache.s('|=' + val, new RegExp('^' + clean(val) + '(-|$)')));
-    }
-    return false;
-  }
-
-  function _qwery(selector) {
-    var r = [], ret = [], i, l,
-        tokens = tokenCache.g(selector) || tokenCache.s(selector, selector.split(tokenizr));
-    tokens = tokens.slice(0);
-    if (!tokens.length) {
-      return r;
-    }
-    r = loopAll(tokens);
-    if (!tokens.length) {
-      return r;
-    }
-    // loop through all descendent tokens
-    for (j = 0, l = r.length, k = 0; j < l; j++) {
-      node = r[j];
-      p = node;
-      // loop through each token
-      for (i = tokens.length; i--;) {
-        z: // loop through parent nodes
-        while (p !== html && (p = p.parentNode)) {
-          if (found = interpret.apply(p, q(tokens[i]))) {
-            break z;
-          }
-        }
-      }
-      found && (ret[k++] = node);
-    }
-    return ret;
-  }
-
-  var isAncestor = 'compareDocumentPosition' in html ?
-    function (element, container) {
-      return (container.compareDocumentPosition(element) & 16) == 16;
-    } : 'contains' in html ?
-    function (element, container) {
-      return container !== element && container.contains(element);
-    } :
-    function (element, container) {
-      while (element = element.parentNode) {
-        if (element === container) {
-          return 1;
-        }
-      }
-      return 0;
-    };
-
-  function boilerPlate(selector, _root, fn) {
-    var root = (typeof _root == 'string') ? fn(_root)[0] : (_root || doc);
-    if (isNode(selector)) {
-      return !_root || (isNode(root) && isAncestor(selector, root)) ? [selector] : [];
-    }
-    if (selector && typeof selector === 'object' && isFinite(selector.length)) {
-      return array(selector);
-    }
-    if (m = selector.match(idOnly)) {
-      return (el = doc.getElementById(m[1])) ? [el] : [];
-    }
-    if (m = selector.match(tagOnly)) {
-      return array(root.getElementsByTagName(m[1]));
-    }
-    return false;
-  }
-
-  function isNode(el) {
-    return (el === window || el && el.nodeType && el.nodeType.toString().match(/[19]/));
-  }
-
-  function qsa(selector, _root) {
-    var root = (typeof _root == 'string') ? qsa(_root)[0] : (_root || doc);
-    if (!root || !selector) {
-      return [];
-    }
-    if (m = boilerPlate(selector, _root, qsa)) {
-      return m;
-    }
-    if (doc.getElementsByClassName && (m = selector.match(classOnly))) {
-      return array((root).getElementsByClassName(m[1]));
-    }
-    return array((root).querySelectorAll(selector));
-  }
-
-  function uniq(ar) {
-    var a = [], i, j;
-    label:
-    for (i = 0; i < ar.length; i++) {
-      for (j = 0; j < a.length; j++) {
-        if (a[j] == ar[i]) {
-          continue label;
-        }
-      }
-      a[a.length] = ar[i];
-    }
-    return a;
-  }
-
-  var qwery = function () {
-    // return fast. boosh.
-    if (doc.querySelector && doc.querySelectorAll) {
-      return qsa;
-    }
-    return function (selector, _root) {
-      var root = (typeof _root == 'string') ? qwery(_root)[0] : (_root || doc);
-      if (!root || !selector) {
-        return [];
-      }
-      var i, l, result = [], collections = [], element;
-      if (m = boilerPlate(selector, _root, qwery)) {
-        return m;
-      }
-      if (m = selector.match(tagAndOrClass)) {
-        items = root.getElementsByTagName(m[1] || '*');
-        r = classCache.g(m[2]) || classCache.s(m[2], new RegExp('(^|\\s+)' + m[2] + '(\\s+|$)'));
-        for (i = 0, l = items.length, j = 0; i < l; i++) {
-          r.test(items[i].className) && (result[j++] = items[i]);
-        }
-        return result;
-      }
-      for (i = 0, items = selector.split(','), l = items.length; i < l; i++) {
-        collections[i] = _qwery(items[i]);
-      }
-      for (i = 0, l = collections.length; i < l && (collection = collections[i]); i++) {
-        var ret = collection;
-        if (root !== doc) {
-          ret = [];
-          for (j = 0, m = collection.length; j < m && (element = collection[j]); j++) {
-            // make sure element is a descendent of root
-            isAncestor(element, root) && ret.push(element);
-          }
-        }
-        result = result.concat(ret);
-      }
-      return uniq(result);
-    };
-  }();
-
-  qwery.uniq = uniq;
-  var oldQwery = context.qwery;
-  qwery.noConflict = function () {
-    context.qwery = oldQwery;
-    return this;
-  };
-  context.qwery = qwery;
-
-}(this, document);
-!function (doc) {
-  var q = qwery.noConflict();
-  function create(node, root) {
-    var el = (root || doc).createElement('div'), els = [];
-    el.innerHTML = node;
-    var nodes = el.childNodes;
-    el = el.firstChild;
-    els.push(el);
-    while (el = el.nextSibling) {
-      (el.nodeType == 1) && els.push(el);
-    }
-    return els;
-  };
-  $._select = function (s, r) {
-    return /^\s*</.test(s) ? create(s, r) : q(s, r);
-  };
-  $.ender({
-    find: function (s) {
-      var r = [], i, l, j, k, els;
-      for (i = 0, l = this.length; i < l; i++) {
-        els = q(s, this[i]);
-        for (j = 0, k = els.length; j < k; j++) {
-          r.push(els[j]);
-        }
-      }
-      return $(q.uniq(r));
-    }
-  }, true);
-}(document);
-/*!
-  * bonzo.js - copyright @dedfat 2011
-  * https://github.com/ded/bonzo
-  * Follow our software http://twitter.com/dedfat
-  * MIT License
-  */
-!function (context) {
-
-  var doc = context.document,
-      html = doc.documentElement,
-      query = null,
-      byTag = 'getElementsByTagName',
-      specialAttributes = /^checked|value|selected$/,
-      stateAttributes = /^checked|selected$/,
-      ie = /msie/i.test(navigator.userAgent),
-      uidList = [],
-      uuids = 0,
-      digit = /^-?\d+$/,
-      px = 'px',
-      // commonly used methods
-      setAttribute = 'setAttribute',
-      getAttribute = 'getAttribute',
-      trimReplace = /(^\s*|\s*$)/g,
-      unitless = { lineHeight: 1, zoom: 1, zIndex: 1, opacity: 1 };
-
-  function classReg(c) {
-    return new RegExp("(^|\\s+)" + c + "(\\s+|$)");
-  }
-
-  function each(ar, fn, scope) {
-    for (var i = 0, l = ar.length; i < l; i++) {
-      fn.call(scope || ar[i], ar[i], i, ar);
-    }
-    return ar;
-  }
-
-  var trim = String.prototype.trim ?
-    function (s) {
-      return s.trim();
-    } :
-    function (s) {
-      return s.replace(trimReplace, '');
-    };
-
-  function camelize(s) {
-    return s.replace(/-(.)/g, function (m, m1) {
-      return m1.toUpperCase();
-    });
-  }
-
-  function is(node) {
-    return node && node.nodeName && node.nodeType == 1;
-  }
-
-  function some(ar, fn, scope) {
-    for (var i = 0, j = ar.length; i < j; ++i) {
-      if (fn.call(scope, ar[i], i, ar)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  var getStyle = doc.defaultView && doc.defaultView.getComputedStyle ?
-    function (el, property) {
-      var value = null;
-      if (property == 'float') {
-        property = 'cssFloat';
-      }
-      var computed = doc.defaultView.getComputedStyle(el, '');
-      computed && (value = computed[camelize(property)]);
-      return el.style[property] || value;
-
-    } : (ie && html.currentStyle) ?
-
-    function (el, property) {
-      property = camelize(property);
-      property = property == 'float' ? 'styleFloat' : property;
-
-      if (property == 'opacity') {
-        var val = 100;
-        try {
-          val = el.filters['DXImageTransform.Microsoft.Alpha'].opacity;
-        } catch (e1) {
-          try {
-            val = el.filters('alpha').opacity;
-          } catch (e2) {}
-        }
-        return val / 100;
-      }
-      var value = el.currentStyle ? el.currentStyle[property] : null;
-      return el.style[property] || value;
-    } :
-
-    function (el, property) {
-      return el.style[camelize(property)];
-    };
-
-  function insert(target, host, fn) {
-    var i = 0, self = host || this, r = [];
-    each(normalize(query ? query(target) : target), function (t) {
-      each(self, function (el) {
-        var n = el.cloneNode(true);
-        fn(t, n);
-        r[i] = n;
-        i++;
-      });
-    }, this);
-    each(r, function (e, i) {
-      self[i] = e;
-    });
-    self.length = i;
-    return self;
-  }
-
-  function xy(el, x, y) {
-    var $el = bonzo(el),
-        style = $el.css('position'),
-        offset = $el.offset(),
-        rel = 'relative',
-        isRel = style == rel,
-        delta = [parseInt($el.css('left'), 10), parseInt($el.css('top'), 10)];
-
-    if (style == 'static') {
-      $el.css('position', rel);
-      style = rel;
-    }
-
-    isNaN(delta[0]) && (delta[0] = isRel ? 0 : el.offsetLeft);
-    isNaN(delta[1]) && (delta[1] = isRel ? 0 : el.offsetTop);
-
-    x !== null && (el.style.left = x - offset.left + delta[0] + 'px');
-    y !== null && (el.style.top = y - offset.top + delta[1] + 'px');
-
-  }
-
-  function _bonzo(elements) {
-    this.length = 0;
-    this.original = elements;
-    if (elements) {
-      elements = typeof elements !== 'string' &&
-        !elements.nodeType &&
-        typeof elements.length !== 'undefined' ?
-          elements :
-          [elements];
-      this.length = elements.length;
-      for (var i = 0; i < elements.length; i++) {
-        this[i] = elements[i];
-      }
-    }
-  }
-
-  _bonzo.prototype = {
-
-    each: function (fn, scope) {
-      return each(this, fn, scope);
-    },
-
-    map: function (fn, reject) {
-      var m = [], n;
-      for (var i = 0; i < this.length; i++) {
-        n = fn.call(this, this[i]);
-        reject ? (reject(n) && m.push(n)) : m.push(n);
-      }
-      return m;
-    },
-
-    first: function () {
-      return bonzo(this[0]);
-    },
-
-    last: function () {
-      return bonzo(this[this.length - 1]);
-    },
-
-    html: function (h, text) {
-      var method = text ?
-        html.textContent == null ?
-          'innerText' :
-          'textContent' :
-        'innerHTML';
-      return typeof h !== 'undefined' ?
-        this.each(function (el) {
-          el[method] = h;
-        }) :
-        this[0] ? this[0][method] : '';
-    },
-
-    text: function (text) {
-      return this.html(text, 1);
-    },
-
-    addClass: function (c) {
-      return this.each(function (el) {
-        this.hasClass(el, c) || (el.className = trim(el.className + ' ' + c));
-      }, this);
-    },
-
-    removeClass: function (c) {
-      return this.each(function (el) {
-        this.hasClass(el, c) && (el.className = trim(el.className.replace(classReg(c), ' ')));
-      }, this);
-    },
-
-    hasClass: function (el, c) {
-      return typeof c == 'undefined' ?
-        some(this, function (i) {
-          return classReg(el).test(i.className);
-        }) :
-        classReg(c).test(el.className);
-    },
-
-    toggleClass: function (c, condition) {
-      if (typeof condition !== 'undefined' && !condition) {
-        return this;
-      }
-      return this.each(function (el) {
-        this.hasClass(el, c) ?
-          (el.className = trim(el.className.replace(classReg(c), ' '))) :
-          (el.className = trim(el.className + ' ' + c));
-      }, this);
-    },
-
-    show: function (elements) {
-      return this.each(function (el) {
-        el.style.display = '';
-      });
-    },
-
-    hide: function (elements) {
-      return this.each(function (el) {
-        el.style.display = 'none';
-      });
-    },
-
-    append: function (node) {
-      return this.each(function (el) {
-        each(normalize(node), function (i) {
-          el.appendChild(i);
-        });
-      });
-    },
-
-    prepend: function (node) {
-      return this.each(function (el) {
-        var first = el.firstChild;
-        each(normalize(node), function (i) {
-          el.insertBefore(i, first);
-        });
-      });
-    },
-
-    appendTo: function (target, host) {
-      return insert.call(this, target, host, function (t, el) {
-        t.appendChild(el);
-      });
-    },
-
-    prependTo: function (target, host) {
-      return insert.call(this, target, host, function (t, el) {
-        t.insertBefore(el, t.firstChild);
-      });
-    },
-
-    next: function () {
-      return this.related('nextSibling');
-    },
-
-    previous: function () {
-      return this.related('previousSibling');
-    },
-
-    related: function (method) {
-      return this.map(
-        function (el) {
-          el = el[method];
-          while (el && el.nodeType !== 1) {
-            el = el[method];
-          }
-          return el || 0;
-        },
-        function (el) {
-          return el;
-        }
-      );
-    },
-
-    before: function (node) {
-      return this.each(function (el) {
-        each(bonzo.create(node), function (i) {
-          el.parentNode.insertBefore(i, el);
-        });
-      });
-    },
-
-    after: function (node) {
-      return this.each(function (el) {
-        each(bonzo.create(node), function (i) {
-          el.parentNode.insertBefore(i, el.nextSibling);
-        });
-      });
-    },
-
-    insertBefore: function (target, host) {
-      return insert.call(this, target, host, function (t, el) {
-        t.parentNode.insertBefore(el, t);
-      });
-    },
-
-    insertAfter: function (target, host) {
-      return insert.call(this, target, host, function (t, el) {
-        t.parentNode.insertBefore(el, (t.nextSibling || t));
-      });
-    },
-
-    css: function (o, v) {
-      // is this a request for just getting a style?
-      if (v === undefined && typeof o == 'string') {
-        return getStyle(this[0], o);
-      }
-      var iter = o;
-      if (typeof o == 'string') {
-        iter = {};
-        iter[o] = v;
-      }
-
-      if (ie && iter.opacity) {
-        // oh this 'ol gamut
-        iter.filter = 'alpha(opacity=' + (iter.opacity * 100) + ')';
-        // give it layout
-        iter.zoom = o.zoom || 1;
-        delete iter.opacity;
-      }
-
-      if (v = iter['float']) {
-        // float is a reserved style word. w3 uses cssFloat, ie uses styleFloat
-        ie ? (iter.styleFloat = v) : (iter.cssFloat = v);
-        delete iter['float'];
-      }
-
-      var fn = function (el, p, v) {
-        for (var k in iter) {
-          if (iter.hasOwnProperty(k)) {
-            v = iter[k];
-            // change "5" to "5px" - unless you're line-height, which is allowed
-            (p = camelize(k)) && digit.test(v) && !(p in unitless) && (v += px);
-            el.style[p] = v;
-          }
-        }
-      };
-      return this.each(fn);
-    },
-
-    offset: function (x, y) {
-      if (x || y) {
-        return this.each(function (el) {
-          xy(el, x, y);
-        });
-      }
-      var el = this[0];
-      var width = el.offsetWidth;
-      var height = el.offsetHeight;
-      var top = el.offsetTop;
-      var left = el.offsetLeft;
-      while (el = el.offsetParent) {
-        top = top + el.offsetTop;
-        left = left + el.offsetLeft;
-      }
-
-      return {
-        top: top,
-        left: left,
-        height: height,
-        width: width
-      };
-    },
-
-    attr: function (k, v) {
-      var el = this[0];
-      return typeof v == 'undefined' ?
-        specialAttributes.test(k) ?
-          stateAttributes.test(k) && typeof el[k] == 'string' ?
-            true : el[k] : el[getAttribute](k) :
-        this.each(function (el) {
-          el[setAttribute](k, v);
-        });
-    },
-
-    val: function (s) {
-      return this.attr('value', s);
-    },
-
-    removeAttr: function (k) {
-      return this.each(function (el) {
-        el.removeAttribute(k);
-      });
-    },
-
-    data: function (k, v) {
-      var el = this[0];
-      if (typeof v === 'undefined') {
-        el[getAttribute]('data-node-uid') || el[setAttribute]('data-node-uid', ++uuids);
-        var uid = el[getAttribute]('data-node-uid');
-        uidList[uid] || (uidList[uid] = {});
-        return uidList[uid][k];
       } else {
-        return this.each(function (el) {
-          el[getAttribute]('data-node-uid') || el[setAttribute]('data-node-uid', ++uuids);
-          var uid = el[getAttribute]('data-node-uid');
-          var o = {};
-          o[k] = v;
-          uidList[uid] = o;
-        });
+        this._add(models, options);
       }
+      return this;
     },
 
-    remove: function () {
-      return this.each(function (el) {
-        el.parentNode && el.parentNode.removeChild(el);
-      });
-    },
-
-    empty: function () {
-      return this.each(function (el) {
-        while (el.firstChild) {
-          el.removeChild(el.firstChild);
+    // Remove a model, or a list of models from the set. Pass silent to avoid
+    // firing the `removed` event for every model removed.
+    remove : function(models, options) {
+      if (_.isArray(models)) {
+        for (var i = 0, l = models.length; i < l; i++) {
+          this._remove(models[i], options);
         }
-      });
-    },
-
-    detach: function () {
-      return this.map(function (el) {
-        return el.parentNode.removeChild(el);
-      });
-    },
-
-    scrollTop: function (y) {
-      return scroll.call(this, null, y, 'y');
-    },
-
-    scrollLeft: function (x) {
-      return scroll.call(this, x, null, 'x');
-    },
-
-    serialize: function () {
-      var form = this[0],
-          inputs = form[byTag]('input'),
-          selects = form[byTag]('select'),
-          texts = form[byTag]('textarea');
-      return (bonzo(inputs).map(serial).join('') +
-      bonzo(selects).map(serial).join('') +
-      bonzo(texts).map(serial).join('')).replace(/&$/, '');
-    },
-
-    serializeArray: function () {
-      for (var pairs = this.serialize().split('&'), i = 0, l = pairs.length, r = [], o; i < l; i++) {
-        pairs[i] && (o = pairs[i].split('=')) && r.push({name: o[0], value: o[1]});
+      } else {
+        this._remove(models, options);
       }
-      return r;
-    }
-  };
+      return this;
+    },
 
-  function enc(v) {
-    return encodeURIComponent(v);
-  }
+    // Get a model from the set by id.
+    get : function(id) {
+      if (id == null) return null;
+      return this._byId[id.id != null ? id.id : id];
+    },
 
-  function serial(el) {
-    var n = el.name;
-    // don't serialize elements that are disabled or without a name
-    if (el.disabled || !n) {
-      return '';
-    }
-    n = enc(n);
-    switch (el.tagName.toLowerCase()) {
-    case 'input':
-      switch (el.type) {
-      case 'reset':
-      case 'button':
-      case 'image':
-      case 'file':
-        return '';
-      case 'checkbox':
-      case 'radio':
-        return el.checked ? n + '=' + (el.value ? enc(el.value) : true) + '&' : '';
-      default: // text hidden password submit
-        return n + '=' + (el.value ? enc(el.value) : true) + '&';
+    // Get a model from the set by client id.
+    getByCid : function(cid) {
+      return cid && this._byCid[cid.cid || cid];
+    },
+
+    // Get the model at the given index.
+    at: function(index) {
+      return this.models[index];
+    },
+
+    // Force the collection to re-sort itself. You don't need to call this under normal
+    // circumstances, as the set will maintain sort order as each item is added.
+    sort : function(options) {
+      options || (options = {});
+      if (!this.comparator) throw new Error('Cannot sort a set without a comparator');
+      this.models = this.sortBy(this.comparator);
+      if (!options.silent) this.trigger('refresh', this, options);
+      return this;
+    },
+
+    // Pluck an attribute from each model in the collection.
+    pluck : function(attr) {
+      return _.map(this.models, function(model){ return model.get(attr); });
+    },
+
+    // When you have more items than you want to add or remove individually,
+    // you can refresh the entire set with a new list of models, without firing
+    // any `added` or `removed` events. Fires `refresh` when finished.
+    refresh : function(models, options) {
+      models  || (models = []);
+      options || (options = {});
+      this._reset();
+      this.add(models, {silent: true});
+      if (!options.silent) this.trigger('refresh', this, options);
+      return this;
+    },
+
+    // Fetch the default set of models for this collection, refreshing the
+    // collection when they arrive.
+    fetch : function(options) {
+      options || (options = {});
+      var collection = this;
+      var success = function(resp) {
+        collection.refresh(collection.parse(resp));
+        if (options.success) options.success(collection, resp);
+      };
+      var error = wrapError(options.error, collection, options);
+      (this.sync || Backbone.sync)('read', this, success, error);
+      return this;
+    },
+
+    // Create a new instance of a model in this collection. After the model
+    // has been created on the server, it will be added to the collection.
+    create : function(model, options) {
+      var coll = this;
+      options || (options = {});
+      if (!(model instanceof Backbone.Model)) {
+        model = new this.model(model, {collection: coll});
+      } else {
+        model.collection = coll;
       }
-      break;
-    case 'textarea':
-      return n + '=' + enc(el.value) + '&';
-    case 'select':
-      // @todo refactor beyond basic single selected value case
-      return n + '=' + enc(el.options[el.selectedIndex].value) + '&';
+      var success = function(nextModel, resp) {
+        coll.add(nextModel);
+        if (options.success) options.success(nextModel, resp);
+      };
+      return model.save(null, {success : success, error : options.error});
+    },
+
+    // **parse** converts a response into a list of models to be added to the
+    // collection. The default implementation is just to pass it through.
+    parse : function(resp) {
+      return resp;
+    },
+
+    // Proxy to _'s chain. Can't be proxied the same way the rest of the
+    // underscore methods are proxied because it relies on the underscore
+    // constructor.
+    chain: function () {
+      return _(this.models).chain();
+    },
+
+    // Reset all internal state. Called when the collection is refreshed.
+    _reset : function(options) {
+      this.length = 0;
+      this.models = [];
+      this._byId  = {};
+      this._byCid = {};
+    },
+
+    // Internal implementation of adding a single model to the set, updating
+    // hash indexes for `id` and `cid` lookups.
+    _add : function(model, options) {
+      options || (options = {});
+      if (!(model instanceof Backbone.Model)) {
+        model = new this.model(model, {collection: this});
+      }
+      var already = this.getByCid(model);
+      if (already) throw new Error(["Can't add the same model to a set twice", already.id]);
+      this._byId[model.id] = model;
+      this._byCid[model.cid] = model;
+      model.collection = this;
+      var index = this.comparator ? this.sortedIndex(model, this.comparator) : this.length;
+      this.models.splice(index, 0, model);
+      model.bind('all', this._boundOnModelEvent);
+      this.length++;
+      if (!options.silent) model.trigger('add', model, this, options);
+      return model;
+    },
+
+    // Internal implementation of removing a single model from the set, updating
+    // hash indexes for `id` and `cid` lookups.
+    _remove : function(model, options) {
+      options || (options = {});
+      model = this.getByCid(model) || this.get(model);
+      if (!model) return null;
+      delete this._byId[model.id];
+      delete this._byCid[model.cid];
+      delete model.collection;
+      this.models.splice(this.indexOf(model), 1);
+      this.length--;
+      if (!options.silent) model.trigger('remove', model, this, options);
+      model.unbind('all', this._boundOnModelEvent);
+      return model;
+    },
+
+    // Internal method called every time a model in the set fires an event.
+    // Sets need to update their indexes when models change ids. All other
+    // events simply proxy through.
+    _onModelEvent : function(ev, model) {
+      if (ev === 'change:id') {
+        delete this._byId[model.previous('id')];
+        this._byId[model.id] = model;
+      }
+      this.trigger.apply(this, arguments);
     }
-    return '';
-  }
 
-  function normalize(node) {
-    return typeof node == 'string' ? bonzo.create(node) : is(node) ? [node] : node;
-  }
+  });
 
-  function scroll(x, y, type) {
-    var el = this[0];
-    if (x == null && y == null) {
-      return (isBody(el) ? getWindowScroll() : { x: el.scrollLeft, y: el.scrollTop })[type];
-    }
-    if (isBody(el)) {
-      window.scrollTo(x, y);
-    } else {
-      x != null && (el.scrollLeft = x);
-      y != null && (el.scrollTop = y);
-    }
-    return this;
-  }
+  // Underscore methods that we want to implement on the Collection.
+  var methods = ['forEach', 'each', 'map', 'reduce', 'reduceRight', 'find', 'detect',
+    'filter', 'select', 'reject', 'every', 'all', 'some', 'any', 'include',
+    'invoke', 'max', 'min', 'sortBy', 'sortedIndex', 'toArray', 'size',
+    'first', 'rest', 'last', 'without', 'indexOf', 'lastIndexOf', 'isEmpty'];
 
-  function isBody(element) {
-    return element === window || (/^(?:body|html)$/i).test(element.tagName);
-  }
-
-  function getWindowScroll() {
-    return { x: window.pageXOffset || html.scrollLeft, y: window.pageYOffset || html.scrollTop };
-  }
-
-  function bonzo(els, host) {
-    return new _bonzo(els, host);
-  }
-
-  bonzo.setQueryEngine = function (q) {
-    query = q;
-    delete bonzo.setQueryEngine;
-  };
-
-  bonzo.aug = function (o, target) {
-    for (var k in o) {
-      o.hasOwnProperty(k) && ((target || _bonzo.prototype)[k] = o[k]);
-    }
-  };
-
-  bonzo.create = function (node) {
-    return typeof node == 'string' ?
-      function () {
-        var el = doc.createElement('div'), els = [];
-        el.innerHTML = node;
-        var nodes = el.childNodes;
-        el = el.firstChild;
-        els.push(el);
-        while (el = el.nextSibling) {
-          (el.nodeType == 1) && els.push(el);
-        }
-        return els;
-
-      }() : is(node) ? [node.cloneNode(true)] : [];
-  };
-
-  bonzo.doc = function () {
-    var w = html.scrollWidth,
-        h = html.scrollHeight,
-        vp = this.viewport();
-    return {
-      width: Math.max(w, vp.width),
-      height: Math.max(h, vp.height)
+  // Mix in each Underscore method as a proxy to `Collection#models`.
+  _.each(methods, function(method) {
+    Backbone.Collection.prototype[method] = function() {
+      return _[method].apply(_, [this.models].concat(_.toArray(arguments)));
     };
+  });
+
+  // Backbone.Controller
+  // -------------------
+
+  // Controllers map faux-URLs to actions, and fire events when routes are
+  // matched. Creating a new one sets its `routes` hash, if not set statically.
+  Backbone.Controller = function(options) {
+    options || (options = {});
+    if (options.routes) this.routes = options.routes;
+    this._bindRoutes();
+    this.initialize(options);
   };
 
-  bonzo.firstChild = function (el) {
-    for (var c = el.childNodes, i = 0, j = (c && c.length) || 0, e; i < j; i++) {
-      if (c[i].nodeType === 1) {
-        e = c[j = i];
+  // Cached regular expressions for matching named param parts and splatted
+  // parts of route strings.
+  var namedParam = /:([\w\d]+)/g;
+  var splatParam = /\*([\w\d]+)/g;
+
+  // Set up all inheritable **Backbone.Controller** properties and methods.
+  _.extend(Backbone.Controller.prototype, Backbone.Events, {
+
+    // Initialize is an empty function by default. Override it with your own
+    // initialization logic.
+    initialize : function(){},
+
+    // Manually bind a single named route to a callback. For example:
+    //
+    //     this.route('search/:query/p:num', 'search', function(query, num) {
+    //       ...
+    //     });
+    //
+    route : function(route, name, callback) {
+      Backbone.history || (Backbone.history = new Backbone.History);
+      if (!_.isRegExp(route)) route = this._routeToRegExp(route);
+      Backbone.history.route(route, _.bind(function(fragment) {
+        var args = this._extractParameters(route, fragment);
+        callback.apply(this, args);
+        this.trigger.apply(this, ['route:' + name].concat(args));
+      }, this));
+    },
+
+    // Simple proxy to `Backbone.history` to save a fragment into the history,
+    // without triggering routes.
+    saveLocation : function(fragment) {
+      Backbone.history.saveLocation(fragment);
+    },
+
+    // Bind all defined routes to `Backbone.history`.
+    _bindRoutes : function() {
+      if (!this.routes) return;
+      for (var route in this.routes) {
+        var name = this.routes[route];
+        this.route(route, name, this[name]);
       }
+    },
+
+    // Convert a route string into a regular expression, suitable for matching
+    // against the current location fragment.
+    _routeToRegExp : function(route) {
+      route = route.replace(namedParam, "([^\/]*)").replace(splatParam, "(.*?)");
+      return new RegExp('^' + route + '$');
+    },
+
+    // Given a route, and a URL fragment that it matches, return the array of
+    // extracted parameters.
+    _extractParameters : function(route, fragment) {
+      return route.exec(fragment).slice(1);
     }
-    return e;
+
+  });
+
+  // Backbone.History
+  // ----------------
+
+  // Handles cross-browser history management, based on URL hashes. If the
+  // browser does not support `onhashchange`, falls back to polling.
+  Backbone.History = function() {
+    this.handlers = [];
+    this.fragment = this.getFragment();
+    _.bindAll(this, 'checkUrl');
   };
 
-  bonzo.viewport = function () {
-    var h = self.innerHeight,
-        w = self.innerWidth;
-    ie && (h = html.clientHeight) && (w = html.clientWidth);
-    return {
-      width: w,
-      height: h
-    };
-  };
+  // Cached regex for cleaning hashes.
+  var hashStrip = /^#*/;
 
-  bonzo.isAncestor = 'compareDocumentPosition' in html ?
-    function (container, element) {
-      return (container.compareDocumentPosition(element) & 16) == 16;
-    } : 'contains' in html ?
-    function (container, element) {
-      return container !== element && container.contains(element);
-    } :
-    function (container, element) {
-      while (element = element.parentNode) {
-        if (element === container) {
+  // Set up all inheritable **Backbone.History** properties and methods.
+  _.extend(Backbone.History.prototype, {
+
+    // The default interval to poll for hash changes, if necessary, is
+    // twenty times a second.
+    interval: 50,
+
+    // Get the cross-browser normalized URL fragment.
+    getFragment : function(loc) {
+      return (loc || window.location).hash.replace(hashStrip, '');
+    },
+
+    // Start the hash change handling, returning `true` if the current URL matches
+    // an existing route, and `false` otherwise.
+    start : function() {
+      var docMode = document.documentMode;
+      var oldIE = ($.browser.msie && (!docMode || docMode <= 7));
+      if (oldIE) {
+        this.iframe = $('<iframe src="javascript:0" tabindex="-1" />').hide().appendTo('body')[0].contentWindow;
+      }
+      if ('onhashchange' in window && !oldIE) {
+        $(window).bind('hashchange', this.checkUrl);
+      } else {
+        setInterval(this.checkUrl, this.interval);
+      }
+      return this.loadUrl();
+    },
+
+    // Add a route to be tested when the hash changes. Routes are matched in the
+    // order they are added.
+    route : function(route, callback) {
+      this.handlers.push({route : route, callback : callback});
+    },
+
+    // Checks the current URL to see if it has changed, and if it has,
+    // calls `loadUrl`, normalizing across the hidden iframe.
+    checkUrl : function() {
+      var current = this.getFragment();
+      if (current == this.fragment && this.iframe) {
+        current = this.getFragment(this.iframe.location);
+      }
+      if (current == this.fragment ||
+          current == decodeURIComponent(this.fragment)) return false;
+      if (this.iframe) {
+        window.location.hash = this.iframe.location.hash = current;
+      }
+      this.loadUrl();
+    },
+
+    // Attempt to load the current URL fragment. If a route succeeds with a
+    // match, returns `true`. If no defined routes matches the fragment,
+    // returns `false`.
+    loadUrl : function() {
+      var fragment = this.fragment = this.getFragment();
+      var matched = _.any(this.handlers, function(handler) {
+        if (handler.route.test(fragment)) {
+          handler.callback(fragment);
           return true;
         }
+      });
+      return matched;
+    },
+
+    // Save a fragment into the hash history. You are responsible for properly
+    // URL-encoding the fragment in advance. This does not trigger
+    // a `hashchange` event.
+    saveLocation : function(fragment) {
+      fragment = (fragment || '').replace(hashStrip, '');
+      if (this.fragment == fragment) return;
+      window.location.hash = this.fragment = fragment;
+      if (this.iframe && (fragment != this.getFragment(this.iframe.location))) {
+        this.iframe.document.open().close();
+        this.iframe.location.hash = fragment;
       }
-      return false;
-    };
-
-  var old = context.bonzo;
-  bonzo.noConflict = function () {
-    context.bonzo = old;
-    return this;
-  };
-  context.bonzo = bonzo;
-
-}(this);!function ($) {
-
-  var b = bonzo.noConflict();
-  b.setQueryEngine($);
-  $.ender(b);
-  $.ender(b(), true);
-  $.ender({
-    create: function (node) {
-      return $(b.create(node));
     }
+
   });
 
-  function indexOf(ar, val) {
-    for (var i = 0; i < ar.length; i++) {
-      if (ar[i] === val) {
-        return i;
-      }
-    }
-    return -1;
-  }
+  // Backbone.View
+  // -------------
 
-  function uniq(ar) {
-    var a = [], i, j;
-    label:
-    for (i = 0; i < ar.length; i++) {
-      for (j = 0; j < a.length; j++) {
-        if (a[j] == ar[i]) {
-          continue label;
-        }
-      }
-      a[a.length] = ar[i];
-    }
-    return a;
-  }
-  $.ender({
-    parents: function (selector, closest) {
-      var collection = $(selector), j, k, p, r = [];
-      for (j = 0, k = this.length; j < k; j++) {
-        p = this[j];
-        while (p = p.parentNode) {
-          if (indexOf(collection, p) !== -1) {
-            r.push(p);
-            if (closest) break;
-          }
-        }
-      }
-      return $(uniq(r));
-    },
-
-    closest: function (selector) {
-      return this.parents(selector, true);
-    },
-
-    first: function () {
-      return $(this[0]);
-    },
-
-    last: function () {
-      return $(this[this.length - 1]);
-    },
-
-    next: function () {
-      return $(b(this).next());
-    },
-
-    previous: function () {
-      return $(b(this).previous());
-    },
-
-    appendTo: function (t) {
-      return b(this.selector).appendTo(t, this);
-    },
-
-    prependTo: function (t) {
-      return b(this.selector).prependTo(t, this);
-    },
-
-    insertAfter: function (t) {
-      return b(this.selector).insertAfter(t, this);
-    },
-
-    insertBefore: function (t) {
-      return b(this.selector).insertBefore(t, this);
-    },
-
-    siblings: function () {
-      var i, l, p, r = [];
-      for (i = 0, l = this.length; i < l; i++) {
-        p = this[i];
-        while (p = p.previousSibling) {
-          p.nodeType == 1 && r.push(p);
-        }
-        p = this[i];
-        while (p = p.nextSibling) {
-          p.nodeType == 1 && r.push(p);
-        }
-      }
-      return $(r);
-    },
-
-    children: function () {
-      var el, r = [];
-      for (i = 0, l = this.length; i < l; i++) {
-        if (!(el = b.firstChild(this[i]))) {
-          continue;
-        }
-        r.push(el);
-        while (el = el.nextSibling) {
-          el.nodeType == 1 && r.push(el);
-        }
-      }
-      return $(uniq(r));
-    },
-
-    height: function (v) {
-      return v ? this.css('height', v) : parseInt(this.css('height'), 10);
-    },
-
-    width: function (v) {
-      return v ? this.css('width', v) : parseInt(this.css('width'), 10);
-    }
-  }, true);
-
-}(ender || $);
-
-/*!
-  * bean.js - copyright @dedfat
-  * https://github.com/fat/bean
-  * Follow our software http://twitter.com/dedfat
-  * MIT License
-  * special thanks to:
-  * dean edwards: http://dean.edwards.name/
-  * dperini: https://github.com/dperini/nwevents
-  * the entire mootools team: github.com/mootools/mootools-core
-  */
-!function (context) {
-  var __uid = 1, registry = {}, collected = {},
-      overOut = /over|out/,
-      namespace = /[^\.]*(?=\..*)\.|.*/,
-      stripName = /\..*/,
-      addEvent = 'addEventListener',
-      attachEvent = 'attachEvent',
-      removeEvent = 'removeEventListener',
-      detachEvent = 'detachEvent',
-      doc = context.document || {},
-      root = doc.documentElement || {},
-      W3C_MODEL = root[addEvent],
-      eventSupport = W3C_MODEL ? addEvent : attachEvent,
-
-  isDescendant = function (parent, child) {
-    var node = child.parentNode;
-    while (node != null) {
-      if (node == parent) {
-        return true;
-      }
-      node = node.parentNode;
-    }
-  },
-
-  retrieveUid = function (obj, uid) {
-    return (obj.__uid = uid || obj.__uid || __uid++);
-  },
-
-  retrieveEvents = function (element) {
-    var uid = retrieveUid(element);
-    return (registry[uid] = registry[uid] || {});
-  },
-
-  listener = W3C_MODEL ? function (element, type, fn, add) {
-    element[add ? addEvent : removeEvent](type, fn, false);
-  } : function (element, type, fn, add, custom) {
-    custom && add && (element['_on' + custom] = element['_on' + custom] || 0);
-    element[add ? attachEvent : detachEvent]('on' + type, fn);
-  },
-
-  nativeHandler = function (element, fn, args) {
-    return function (event) {
-      event = fixEvent(event || ((this.ownerDocument || this.document || this).parentWindow || context).event);
-      return fn.apply(element, [event].concat(args));
-    };
-  },
-
-  customHandler = function (element, fn, type, condition, args) {
-    return function (event) {
-      if (condition ? condition.call(this, event) : W3C_MODEL ? true : event && event.propertyName == '_on' + type || !event) {
-        fn.apply(element, [event].concat(args));
-      }
-    };
-  },
-
-  addListener = function (element, orgType, fn, args) {
-    var type = orgType.replace(stripName, ''),
-        events = retrieveEvents(element),
-        handlers = events[type] || (events[type] = {}),
-        uid = retrieveUid(fn, orgType.replace(namespace, ''));
-    if (handlers[uid]) {
-      return element;
-    }
-    var custom = customEvents[type];
-    if (custom) {
-      fn = custom.condition ? customHandler(element, fn, type, custom.condition) : fn;
-      type = custom.base || type;
-    }
-    var isNative = nativeEvents[type];
-    fn = isNative ? nativeHandler(element, fn, args) : customHandler(element, fn, type, false, args);
-    isNative = W3C_MODEL || isNative;
-    if (type == 'unload') {
-      var org = fn;
-      fn = function () {
-        removeListener(element, type, fn) && org();
-      };
-    }
-    element[eventSupport] && listener(element, isNative ? type : 'propertychange', fn, true, !isNative && type);
-    handlers[uid] = fn;
-    fn.__uid = uid;
-    return type == 'unload' ? element : (collected[retrieveUid(element)] = element);
-  },
-
-  removeListener = function (element, orgType, handler) {
-    var uid, names, uids, i, events = retrieveEvents(element), type = orgType.replace(stripName, '');
-    if (!events || !events[type]) {
-      return element;
-    }
-    names = orgType.replace(namespace, '');
-    uids = names ? names.split('.') : [handler.__uid];
-    for (i = uids.length; i--;) {
-      uid = uids[i];
-      handler = events[type][uid];
-      delete events[type][uid];
-      if (element[eventSupport]) {
-        type = customEvents[type] ? customEvents[type].base : type;
-        var isNative = W3C_MODEL || nativeEvents[type];
-        listener(element, isNative ? type : 'propertychange', handler, false, !isNative && type);
-      }
-    }
-    return element;
-  },
-
-  del = function (selector, fn, $) {
-    return function (e) {
-      var array = typeof selector == 'string' ? $(selector, this) : selector;
-      for (var target = e.target; target && target != this; target = target.parentNode) {
-        for (var i = array.length; i--;) {
-          if (array[i] == target) {
-            return fn.apply(target, arguments);
-          }
-        }
-      }
-    };
-  },
-
-  add = function (element, events, fn, delfn, $) {
-    if (typeof events == 'object' && !fn) {
-      for (var type in events) {
-        events.hasOwnProperty(type) && add(element, type, events[type]);
-      }
-    } else {
-      var isDel = typeof fn == 'string', types = (isDel ? fn : events).split(' ');
-      fn = isDel ? del(events, delfn, $) : fn;
-      for (var i = types.length; i--;) {
-        addListener(element, types[i], fn, Array.prototype.slice.call(arguments, isDel ? 4 : 3));
-      }
-    }
-    return element;
-  },
-
-  remove = function (element, orgEvents, fn) {
-    var k, type, events,
-        isString = typeof(orgEvents) == 'string',
-        names = isString && orgEvents.replace(namespace, ''),
-        rm = removeListener,
-        attached = retrieveEvents(element);
-    if (isString && /\s/.test(orgEvents)) {
-      orgEvents = orgEvents.split(' ');
-      var i = orgEvents.length - 1;
-      while (remove(element, orgEvents[i]) && i--) {}
-      return element;
-    }
-    events = isString ? orgEvents.replace(stripName, '') : orgEvents;
-    if (!attached || (isString && !attached[events])) {
-      return element;
-    }
-    if (typeof fn == 'function') {
-      rm(element, events, fn);
-    } else if (names) {
-      rm(element, orgEvents);
-    } else {
-      rm = events ? rm : remove;
-      type = isString && events;
-      events = events ? (fn || attached[events] || events) : attached;
-      for (k in events) {
-        events.hasOwnProperty(k) && rm(element, type || k, events[k]);
-      }
-    }
-    return element;
-  },
-
-  fire = function (element, type, args) {
-    var evt, k, i, types = type.split(' ');
-    for (i = types.length; i--;) {
-      type = types[i].replace(stripName, '');
-      var isNative = nativeEvents[type],
-          isNamespace = types[i].replace(namespace, ''),
-          handlers = retrieveEvents(element)[type];
-      if (isNamespace) {
-        isNamespace = isNamespace.split('.');
-        for (k = isNamespace.length; k--;) {
-          handlers[isNamespace[k]] && handlers[isNamespace[k]].apply(element, args);
-        }
-      } else if (!args && element[eventSupport]) {
-        fireListener(isNative, type, element);
-      } else {
-        for (k in handlers) {
-          handlers.hasOwnProperty(k) && handlers[k].apply(element, args);
-        }
-      }
-    }
-    return element;
-  },
-
-  fireListener = W3C_MODEL ? function (isNative, type, element) {
-    evt = document.createEvent(isNative ? "HTMLEvents" : "UIEvents");
-    evt[isNative ? 'initEvent' : 'initUIEvent'](type, true, true, context, 1);
-    element.dispatchEvent(evt);
-  } : function (isNative, type, element) {
-    isNative ? element.fireEvent('on' + type, document.createEventObject()) : element['_on' + type]++;
-  },
-
-  clone = function (element, from, type) {
-    var events = retrieveEvents(from), obj, k;
-    obj = type ? events[type] : events;
-    for (k in obj) {
-      obj.hasOwnProperty(k) && (type ? add : clone)(element, type || from, type ? obj[k] : k);
-    }
-    return element;
-  },
-
-  fixEvent = function (e) {
-    var result = {};
-    if (!e) {
-      return result;
-    }
-    var type = e.type, target = e.target || e.srcElement;
-    result.preventDefault = fixEvent.preventDefault(e);
-    result.stopPropagation = fixEvent.stopPropagation(e);
-    result.target = target && target.nodeType == 3 ? target.parentNode : target;
-    if (~type.indexOf('key')) {
-      result.keyCode = e.which || e.keyCode;
-    } else if ((/click|mouse|menu/i).test(type)) {
-      result.rightClick = e.which == 3 || e.button == 2;
-      result.pos = { x: 0, y: 0 };
-      if (e.pageX || e.pageY) {
-        result.clientX = e.pageX;
-        result.clientY = e.pageY;
-      } else if (e.clientX || e.clientY) {
-        result.clientX = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
-        result.clientY = e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
-      }
-      overOut.test(type) && (result.relatedTarget = e.relatedTarget || e[(type == 'mouseover' ? 'from' : 'to') + 'Element']);
-    }
-    for (var k in e) {
-      if (!(k in result)) {
-        result[k] = e[k];
-      }
-    }
-    return result;
+  // Creating a Backbone.View creates its initial element outside of the DOM,
+  // if an existing element is not provided...
+  Backbone.View = function(options) {
+    this._configure(options || {});
+    this._ensureElement();
+    this.delegateEvents();
+    this.initialize(options);
   };
 
-  fixEvent.preventDefault = function (e) {
-    return function () {
-      if (e.preventDefault) {
-        e.preventDefault();
-      }
-      else {
-        e.returnValue = false;
-      }
-    };
+  // Element lookup, scoped to DOM elements within the current view.
+  // This should be prefered to global lookups, if you're dealing with
+  // a specific view.
+  var selectorDelegate = function(selector) {
+    return $(selector, this.el);
   };
 
-  fixEvent.stopPropagation = function (e) {
-    return function () {
-      if (e.stopPropagation) {
-        e.stopPropagation();
-      } else {
-        e.cancelBubble = true;
-      }
-    };
-  };
+  // Cached regex to split keys for `delegate`.
+  var eventSplitter = /^(\w+)\s*(.*)$/;
 
-  var nativeEvents = { click: 1, dblclick: 1, mouseup: 1, mousedown: 1, contextmenu: 1, //mouse buttons
-    mousewheel: 1, DOMMouseScroll: 1, //mouse wheel
-    mouseover: 1, mouseout: 1, mousemove: 1, selectstart: 1, selectend: 1, //mouse movement
-    keydown: 1, keypress: 1, keyup: 1, //keyboard
-    orientationchange: 1, // mobile
-    touchstart: 1, touchmove: 1, touchend: 1, touchcancel: 1, // touch
-    gesturestart: 1, gesturechange: 1, gestureend: 1, // gesture
-    focus: 1, blur: 1, change: 1, reset: 1, select: 1, submit: 1, //form elements
-    load: 1, unload: 1, beforeunload: 1, resize: 1, move: 1, DOMContentLoaded: 1, readystatechange: 1, //window
-    error: 1, abort: 1, scroll: 1 }; //misc
+  // Set up all inheritable **Backbone.View** properties and methods.
+  _.extend(Backbone.View.prototype, Backbone.Events, {
 
-  function check(event) {
-    var related = event.relatedTarget;
-    if (!related) {
-      return related == null;
-    }
-    return (related != this && related.prefix != 'xul' && !/document/.test(this.toString()) && !isDescendant(this, related));
-  }
+    // The default `tagName` of a View's element is `"div"`.
+    tagName : 'div',
 
-  var customEvents = {
-    mouseenter: { base: 'mouseover', condition: check },
-    mouseleave: { base: 'mouseout', condition: check },
-    mousewheel: { base: /Firefox/.test(navigator.userAgent) ? 'DOMMouseScroll' : 'mousewheel' }
-  };
+    // Attach the `selectorDelegate` function as the `$` property.
+    $       : selectorDelegate,
 
-  var bean = { add: add, remove: remove, clone: clone, fire: fire };
+    // Initialize is an empty function by default. Override it with your own
+    // initialization logic.
+    initialize : function(){},
 
-  var clean = function (el) {
-    var uid = remove(el).__uid;
-    if (uid) {
-      delete collected[uid];
-      delete registry[uid];
-    }
-  };
-
-  if (context[attachEvent]) {
-    add(context, 'unload', function () {
-      for (var k in collected) {
-        collected.hasOwnProperty(k) && clean(collected[k]);
-      }
-      context.CollectGarbage && CollectGarbage();
-    });
-  }
-
-  var oldBean = context.bean;
-  bean.noConflict = function () {
-    context.bean = oldBean;
-    return this;
-  };
-
-  (typeof module !== 'undefined' && module.exports) ?
-    (module.exports = bean) :
-    (context.bean = bean);
-
-}(this);!function () {
-  var b = bean.noConflict(),
-      integrate = function (method, type, method2) {
-        var _args = type ? [type] : [];
-        return function () {
-          for (var args, i = 0, l = this.length; i < l; i++) {
-            args = [this[i]].concat(_args, Array.prototype.slice.call(arguments, 0));
-            args.length == 4 && args.push($);
-            !arguments.length && method == 'add' && type && (method = 'fire');
-            b[method].apply(this, args);
-          }
-          return this;
-        };
-      };
-
-  var add = integrate('add'),
-      remove = integrate('remove'),
-      fire = integrate('fire');
-
-  var methods = {
-
-    on: add,
-    addListener: add,
-    bind: add,
-    listen: add,
-    delegate: add,
-
-    unbind: remove,
-    unlisten: remove,
-    removeListener: remove,
-    undelegate: remove,
-
-    emit: fire,
-    trigger: fire,
-
-    cloneEvents: integrate('clone'),
-
-    hover: function (enter, leave) {
-      for (var i = 0, l = this.length; i < l; i++) {
-        b.add.call(this, this[i], 'mouseenter', enter);
-        b.add.call(this, this[i], 'mouseleave', leave);
-      }
+    // **render** is the core function that your view should override, in order
+    // to populate its element (`this.el`), with the appropriate HTML. The
+    // convention is for **render** to always return `this`.
+    render : function() {
       return this;
-    }
-  };
+    },
 
-  var shortcuts = [
-    'blur', 'change', 'click', 'dblclick', 'error', 'focus', 'focusin',
-    'focusout', 'keydown', 'keypress', 'keyup', 'load', 'mousedown',
-    'mouseenter', 'mouseleave', 'mouseout', 'mouseover', 'mouseup',
-    'resize', 'scroll', 'select', 'submit', 'unload'
-  ];
+    // Remove this view from the DOM. Note that the view isn't present in the
+    // DOM by default, so calling this method may be a no-op.
+    remove : function() {
+      $(this.el).remove();
+      return this;
+    },
 
-  for (var i = shortcuts.length; i--;) {
-    var shortcut = shortcuts[i];
-    methods[shortcut] = integrate('add', shortcut);
-  }
+    // For small amounts of DOM Elements, where a full-blown template isn't
+    // needed, use **make** to manufacture elements, one at a time.
+    //
+    //     var el = this.make('li', {'class': 'row'}, this.model.get('title'));
+    //
+    make : function(tagName, attributes, content) {
+      var el = document.createElement(tagName);
+      if (attributes) $(el).attr(attributes);
+      if (content) $(el).html(content);
+      return el;
+    },
 
-  $.ender(methods, true);
-}();
-/*!
-  * Reqwest! A x-browser general purpose XHR connection manager
-  * copyright Dustin Diaz 2011
-  * https://github.com/ded/reqwest
-  * license MIT
-  */
-!function (context) {
-  var twoHundo = /^20\d$/,
-      xhr = ('XMLHttpRequest' in window) ?
-        function () {
-          return new XMLHttpRequest();
-        } :
-        function () {
-          return new ActiveXObject('Microsoft.XMLHTTP');
-        };
-
-  function readyState(o, success, error) {
-    return function () {
-      if (o && o.readyState == 4) {
-        if (twoHundo.test(o.status)) {
-          success(o);
+    // Set callbacks, where `this.callbacks` is a hash of
+    //
+    // *{"event selector": "callback"}*
+    //
+    //     {
+    //       'mousedown .title':  'edit',
+    //       'click .button':     'save'
+    //     }
+    //
+    // pairs. Callbacks will be bound to the view, with `this` set properly.
+    // Uses event delegation for efficiency.
+    // Omitting the selector binds the event to `this.el`.
+    // This only works for delegate-able events: not `focus`, `blur`, and
+    // not `change`, `submit`, and `reset` in Internet Explorer.
+    delegateEvents : function(events) {
+      if (!(events || (events = this.events))) return;
+      $(this.el).unbind();
+      for (var key in events) {
+        var methodName = events[key];
+        var match = key.match(eventSplitter);
+        var eventName = match[1], selector = match[2];
+        var method = _.bind(this[methodName], this);
+        if (selector === '') {
+          $(this.el).bind(eventName, method);
         } else {
-          error(o);
+          $(this.el).delegate(selector, eventName, method);
         }
       }
-    };
-  }
-
-  function setHeaders(http, options) {
-    var headers = options.headers || {};
-    headers.Accept = 'text/javascript, text/html, application/xml, text/xml, */*';
-    if (options.data) {
-      headers['Content-type'] = 'application/x-www-form-urlencoded';
-      for (var h in headers) {
-        headers.hasOwnProperty(h) && http.setRequestHeader(h, headers[h], false);
-      }
-    }
-  }
-
-  function getRequest(o, fn, err) {
-    var http = xhr();
-    http.open(o.method || 'GET', typeof o == 'string' ? o : o.url, true);
-    setHeaders(http, o);
-    http.onreadystatechange = readyState(http, fn, err);
-    o.before && o.before(http);
-    http.send(o.data || null);
-    return http;
-  }
-
-  function Reqwest(o, fn) {
-    this.o = o;
-    this.fn = fn;
-    init.apply(this, arguments);
-  }
-
-  function setType(url) {
-    if (/\.json$/.test(url)) {
-      return 'json';
-    }
-    if (/\.js$/.test(url)) {
-      return 'js';
-    }
-    if (/\.html?$/.test(url)) {
-      return 'html';
-    }
-    if (/\.xml$/.test(url)) {
-      return 'xml';
-    }
-    return 'js';
-  }
-
-  function init(o, fn) {
-    this.url = typeof o == 'string' ? o : o.url;
-    this.timeout = null;
-    var type = o.type || setType(this.url), self = this;
-    fn = fn || function () {};
-
-    if (o.timeout) {
-      this.timeout = setTimeout(function () {
-        self.abort();
-        error();
-      }, o.timeout);
-    }
-
-    function complete(resp) {
-      o.complete && o.complete(resp);
-    }
-
-    function success(resp) {
-      o.timeout && clearTimeout(self.timeout) && (self.timeout = null);
-      var r = resp.responseText;
-
-      switch (type) {
-      case 'json':
-        resp = eval('(' + r + ')');
-        break;
-      case 'js':
-        resp = eval(r);
-        break;
-      case 'html':
-        resp = r;
-        break;
-      // default is the response from server
-      }
-
-      fn(resp);
-      o.success && o.success(resp);
-      complete(resp);
-    }
-
-    function error(resp) {
-      o.error && o.error(resp);
-      complete(resp);
-    }
-
-    this.request = getRequest(o, success, error);
-  }
-
-  Reqwest.prototype = {
-    abort: function () {
-      this.request.abort();
     },
 
-    retry: function () {
-      init.call(this, this.o, this.fn);
+    // Performs the initial configuration of a View with a set of options.
+    // Keys with special meaning *(model, collection, id, className)*, are
+    // attached directly to the view.
+    _configure : function(options) {
+      if (this.options) options = _.extend({}, this.options, options);
+      if (options.model)      this.model      = options.model;
+      if (options.collection) this.collection = options.collection;
+      if (options.el)         this.el         = options.el;
+      if (options.id)         this.id         = options.id;
+      if (options.className)  this.className  = options.className;
+      if (options.tagName)    this.tagName    = options.tagName;
+      this.options = options;
+    },
+
+    // Ensure that the View has a DOM element to render into.
+    _ensureElement : function() {
+      if (this.el) return;
+      var attrs = {};
+      if (this.id) attrs.id = this.id;
+      if (this.className) attrs["class"] = this.className;
+      this.el = this.make(this.tagName, attrs);
     }
+
+  });
+
+  // The self-propagating extend function that Backbone classes use.
+  var extend = function (protoProps, classProps) {
+    var child = inherits(this, protoProps, classProps);
+    child.extend = extend;
+    return child;
   };
 
-  function reqwest(o, fn) {
-    return new Reqwest(o, fn);
-  }
+  // Set up inheritance for the model, collection, and view.
+  Backbone.Model.extend = Backbone.Collection.extend =
+    Backbone.Controller.extend = Backbone.View.extend = extend;
 
-  var old = context.reqwest;
-  reqwest.noConflict = function () {
-    context.reqwest = old;
-    return this;
+  // Map from CRUD to HTTP for our default `Backbone.sync` implementation.
+  var methodMap = {
+    'create': 'POST',
+    'update': 'PUT',
+    'delete': 'DELETE',
+    'read'  : 'GET'
   };
-  context.reqwest = reqwest;
 
-}(this);$.ender({
-  ajax: reqwest.noConflict()
-});
-/*!
-  * emile.js (c) 2009 - 2011 Thomas Fuchs
-  * Licensed under the terms of the MIT license.
-  */
-!function (context) {
-  var parseEl = document.createElement('div'),
-      prefixes = ["webkit", "Moz", "O"],
-      j = 3,
-      prefix,
-      _prefix,
-      d = /\d+$/,
-      animationProperties = {},
-      baseProps = 'backgroundColor borderBottomColor borderLeftColor ' +
-        'borderRightColor borderTopColor color fontWeight lineHeight ' +
-        'opacity outlineColor zIndex',
-      pixelProps = 'top bottom left right ' +
-        'borderWidth borderBottomWidth borderLeftWidth borderRightWidth borderTopWidth ' +
-        'borderSpacing borderRadius ' +
-        'marginBottom marginLeft marginRight marginTop ' +
-        'width height ' +
-        'maxHeight maxWidth minHeight minWidth ' +
-        'paddingBottom paddingLeft paddingRight paddingTop ' +
-        'fontSize wordSpacing textIndent letterSpacing ' +
-        'outlineWidth outlineOffset',
+  // Backbone.sync
+  // -------------
 
-      props = (baseProps + ' ' + pixelProps).split(' ');
+  // Override this function to change the manner in which Backbone persists
+  // models to the server. You will be passed the type of request, and the
+  // model in question. By default, uses makes a RESTful Ajax request
+  // to the model's `url()`. Some possible customizations could be:
+  //
+  // * Use `setTimeout` to batch rapid-fire updates into a single request.
+  // * Send up the models as XML instead of JSON.
+  // * Persist models via WebSockets instead of Ajax.
+  //
+  // Turn on `Backbone.emulateHTTP` in order to send `PUT` and `DELETE` requests
+  // as `POST`, with a `_method` parameter containing the true HTTP method,
+  // as well as all requests with the body as `application/x-www-form-urlencoded` instead of
+  // `application/json` with the model in a param named `model`.
+  // Useful when interfacing with server-side languages like **PHP** that make
+  // it difficult to read the body of `PUT` requests.
+  Backbone.sync = function(method, model, success, error) {
+    var type = methodMap[method];
+    var modelJSON = (method === 'create' || method === 'update') ?
+                    JSON.stringify(model.toJSON()) : null;
 
-  while (j--) {
-    _prefix = prefixes[j];
-    parseEl.style.cssText = "-" + _prefix.toLowerCase() + "-transition-property:opacity;";
-    if (typeof parseEl.style[_prefix + "TransitionProperty"] != "undefined") {
-      prefix = _prefix;
+    // Default JSON-request options.
+    var params = {
+      url:          getUrl(model),
+      type:         type,
+      contentType:  'application/json',
+      data:         modelJSON,
+      dataType:     'json',
+      processData:  false,
+      success:      success,
+      error:        error
+    };
+
+    // For older servers, emulate JSON by encoding the request into an HTML-form.
+    if (Backbone.emulateJSON) {
+      params.contentType = 'application/x-www-form-urlencoded';
+      params.processData = true;
+      params.data        = modelJSON ? {model : modelJSON} : {};
     }
-  }
-  var transitionEnd = /^w/.test(prefix) ? 'webkitTransitionEnd' : 'transitionend';
-  for (var p = pixelProps.split(' '), i = p.length; i--;) {
-    animationProperties[p[i]] = 1;
-  }
 
-  function map(o, fn, scope) {
-    var a = [], i;
-    for (i in o) {
-      a.push(fn.call(scope, o[i], i, o));
-    }
-    return a;
-  }
-
-  function camelize(s) {
-    return s.replace(/-(.)/g, function (m, m1) {
-      return m1.toUpperCase();
-    });
-  }
-
-  function serialize(o, modify) {
-    return map(o, function (v, k) {
-      var kv = modify ? modify(k, v) : [k, v];
-      return kv[0] + ':' + kv[1] + ';';
-    }).join('');
-  }
-
-  function camelToDash(s) {
-    if (s.toUpperCase() === s) {
-      return s;
-    }
-    return s.replace(/([a-zA-Z0-9])([A-Z])/g, function (m, m1, m2) {
-      return (m1 + "-" + m2);
-    }).toLowerCase();
-  }
-
-  function interpolate(source, target, pos) {
-    return (source + (target - source) * pos).toFixed(3);
-  }
-
-  function s(str, p, c) {
-    return str.substr(p, c || 1);
-  }
-
-  function color(source, target, pos) {
-    var i = 2, j, c, tmp, v = [], r = [];
-    while ((j = 3) && (c = arguments[i - 1]) && i--) {
-      if (s(c, 0) == 'r') {
-        c = c.match(/\d+/g);
-        while (j--) {
-          v.push(~~c[j]);
-        }
-      } else {
-        if (c.length == 4) {
-          c = '#' + s(c, 1) + s(c, 1) + s(c, 2) + s(c, 2) + s(c, 3) + s(c, 3);
-        }
-        while (j--) {
-          v.push(parseInt(s(c, 1 + j * 2, 2), 16));
-        }
-      }
-    }
-    while (j--) {
-      tmp = ~~(v[j + 3] + (v[j] - v[j + 3]) * pos);
-      r.push(tmp < 0 ? 0 : tmp > 255 ? 255 : tmp);
-    }
-    return 'rgb(' + r.join(',') + ')';
-  }
-
-  function parse(prop) {
-    var p = parseFloat(prop), q = prop ? prop.replace(/^[\-\d\.]+/, '') : prop;
-    return isNaN(p) ?
-      { v: q,
-        f: color,
-        u: ''
-      } :
-      {
-        v: p,
-        f: interpolate,
-        u: q
-      };
-  }
-
-  function normalize(style) {
-    var css, rules = {}, i = props.length, v;
-    parseEl.innerHTML = '<div style="' + style + '"></div>';
-    css = parseEl.childNodes[0].style;
-    while (i--) {
-      (v = css[props[i]]) && (rules[props[i]] = parse(v));
-    }
-    return rules;
-  }
-
-  function _emile(el, style, opts, after) {
-    opts = opts || {};
-    var target = normalize(style),
-        comp = el.currentStyle ? el.currentStyle : getComputedStyle(el, null),
-        current = {}, start = +new Date(), prop,
-        dur = opts.duration || 200, finish = start + dur, interval,
-        easing = opts.easing || function (pos) {
-          return (-Math.cos(pos * Math.PI) / 2) + 0.5;
+    // For older servers, emulate HTTP by mimicking the HTTP method with `_method`
+    // And an `X-HTTP-Method-Override` header.
+    if (Backbone.emulateHTTP) {
+      if (type === 'PUT' || type === 'DELETE') {
+        if (Backbone.emulateJSON) params.data._method = type;
+        params.type = 'POST';
+        params.beforeSend = function(xhr) {
+          xhr.setRequestHeader("X-HTTP-Method-Override", type);
         };
-    for (prop in target) {
-      current[prop] = parse(comp[prop]);
+      }
     }
-    interval = setInterval(function () {
-      var time = +new Date(), p, pos = time > finish ? 1 : (time - start) / dur;
-      for (p in target) {
-        el.style[p] = target[p].f(current[p].v, target[p].v, easing(pos)) + target[p].u;
-      }
-      if (time > finish) {
-        clearInterval(interval);
-        opts.after && opts.after();
-        after && setTimeout(after, 1);
-      }
-    }, 10);
-  }
 
-  function nativeAnim(el, o, opts) {
-    var props = [],
-        styles = [],
-        duration = opts.duration || 1000,
-        easing = opts.easing || 'ease-out';
-    duration = duration + 'ms';
-    opts.after && el.addEventListener(transitionEnd, function f() {
-      opts.after();
-      el.removeEventListener(transitionEnd, f, true);
-    }, true);
+    // Make the request.
+    $.ajax(params);
+  };
 
-    setTimeout(function () {
-      var k;
-      for (k in o) {
-        o.hasOwnProperty(k) && props.push(camelToDash(k) + ' ' + duration + ' ' + easing);
-      }
-      props = props.join(',');
-      el.style[prefix + 'Transition'] = props;
-      for (k in o) {
-        var v = (camelize(k) in animationProperties) && d.test(o[k]) ? o[k] + 'px' : o[k];
-        o.hasOwnProperty(k) && (el.style[camelize(k)] = v);
-      }
-    }, 10);
+  // Helpers
+  // -------
 
-  }
+  // Shared empty constructor function to aid in prototype-chain creation.
+  var ctor = function(){};
 
-  function clone(o) {
-    var r = {};
-    for (var k in o) {
-      r[k] = o[k];
-      (k == 'after') && delete o[k];
+  // Helper function to correctly set up the prototype chain, for subclasses.
+  // Similar to `goog.inherits`, but uses a hash of prototype properties and
+  // class properties to be extended.
+  var inherits = function(parent, protoProps, staticProps) {
+    var child;
+
+    // The constructor function for the new subclass is either defined by you
+    // (the "constructor" property in your `extend` definition), or defaulted
+    // by us to simply call `super()`.
+    if (protoProps && protoProps.hasOwnProperty('constructor')) {
+      child = protoProps.constructor;
+    } else {
+      child = function(){ return parent.apply(this, arguments); };
     }
-    return r;
-  }
 
-  function emile(el, o) {
-    el = typeof el == 'string' ? document.getElementById(el) : el;
-    o = clone(o);
-    var opts = {
-      duration: o.duration,
-      easing: o.easing,
-      after: o.after
+    // Set the prototype chain to inherit from `parent`, without calling
+    // `parent`'s constructor function.
+    ctor.prototype = parent.prototype;
+    child.prototype = new ctor();
+
+    // Add prototype properties (instance properties) to the subclass,
+    // if supplied.
+    if (protoProps) _.extend(child.prototype, protoProps);
+
+    // Add static properties to the constructor function, if supplied.
+    if (staticProps) _.extend(child, staticProps);
+
+    // Correctly set child's `prototype.constructor`, for `instanceof`.
+    child.prototype.constructor = child;
+
+    // Set a convenience property in case the parent's prototype is needed later.
+    child.__super__ = parent.prototype;
+
+    return child;
+  };
+
+  // Helper function to get a URL from a Model or Collection as a property
+  // or as a function.
+  var getUrl = function(object) {
+    if (!(object && object.url)) throw new Error("A 'url' property or function must be specified");
+    return _.isFunction(object.url) ? object.url() : object.url;
+  };
+
+  // Wrap an optional error callback with a fallback error event.
+  var wrapError = function(onError, model, options) {
+    return function(resp) {
+      if (onError) {
+        onError(model, resp);
+      } else {
+        model.trigger('error', model, resp, options);
+      }
     };
-    delete o.duration;
-    delete o.easing;
-    delete o.after;
-    if (prefix && (typeof opts.easing !== 'function')) {
-      return nativeAnim(el, o, opts);
-    }
-    var serial = serialize(o, function (k, v) {
-      k = camelToDash(k);
-      return (camelize(k) in animationProperties) && d.test(v) ?
-        [k, v + 'px'] :
-        [k, v];
-    });
-    _emile(el, serial, opts);
-  }
-
-  var old = context.emile;
-  emile.noConflict = function () {
-    context.emile = old;
-    return this;
-  };
-  context.emile = emile;
-
-}(this);
-!function () {
-  var e = emile.noConflict();
-  var getOptions = function (duration, callback) {
-    var d = typeof duration == 'number' ? duration : 1000;
-    var cb = typeof callback == 'function' ? callback : typeof duration == 'function' ? duration : function(){};
-    return [d, cb]
   };
 
-  function fade(duration, callback, to) {
-    var opts = getOptions(duration, callback);
-    for (var i = 0, l = this.length; i < l; i++) {
-      this[i].style.opacity = to ? 0 : 1;
-      this[i].style.filter = 'alpha(opacity=' + (to ? 0 : 1 ) * 100 + ')';
-      this[i].style.display = '';
-    }
-    return this.animate({
-      opacity: to,
-      duration: opts[0],
-      after: opts[1]
-    });
-  }
+  // Helper function to escape a string for HTML rendering.
+  var escapeHTML = function(string) {
+    return string.replace(/&(?!\w+;)/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  };
 
-  $.ender({
-    animate: function (o) {
-      var self = this;
-      // quick! look! over there! someone is kicking a puppy!
-      setTimeout(function () {
-        for (var i = 0, l = self.length; i < l; i++) {
-          e(self[i], o);
-        }
-      }, 0);
-      return this;
-    },
-
-    fadeIn: function (duration, callback) {
-      return fade.call(this, duration, callback, 1);
-    },
-
-    fadeOut: function (duration, callback) {
-      return fade.call(this, duration, callback, 0);
-    }
-  }, true);
-}();
+})();
+ $.ender(module.exports); }();

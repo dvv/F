@@ -1,0 +1,2 @@
+#!/bin/sh
+exec ender -b jeesh scriptjs backbone json-browser
