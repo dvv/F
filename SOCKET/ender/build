@@ -1,3 +1,2 @@
 #!/bin/sh
-#exec ender -b jeesh scriptjs backbone json-browser wscomm
-exec ender -b jeesh scriptjs json-browser wscomm
+exec ender -b jeesh scriptjs json4ender wscomm

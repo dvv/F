@@ -3,7 +3,7 @@
   * copyright Dustin Diaz & Jacob Thornton 2011 (@ded @fat)
   * https://ender.no.de
   * License MIT
-  * Build: ender -b jeesh scriptjs json-browser wscomm
+  * Build: ender -b jeesh scriptjs json4ender wscomm
   */
 !function (context) {
 
@@ -54,15 +54,15 @@
   * License: MIT
   */
 !function(win, doc, timeout) {
-  var script = doc.getElementsByTagName("script")[0],
-      list = {}, ids = {}, delay = {}, re = /^i|c/,
+  var head = doc.getElementsByTagName('head')[0],
+      list = {}, ids = {}, delay = {},
       scripts = {}, s = 'string', f = false,
       push = 'push', domContentLoaded = 'DOMContentLoaded', readyState = 'readyState',
       addEventListener = 'addEventListener', onreadystatechange = 'onreadystatechange',
       every = function(ar, fn) {
         for (var i = 0, j = ar.length; i < j; ++i) {
           if (!fn(ar[i])) {
-            return 0;
+            return f;
           }
         }
         return 1;
@@ -118,9 +118,9 @@
 
   function create(path, fn) {
     var el = doc.createElement("script"),
-        loaded = 0;
+        loaded = f;
     el.onload = el[onreadystatechange] = function () {
-      if ((el[readyState] && !(!re.test(el[readyState]))) || loaded) {
+      if ((el[readyState] && !(/^c|loade/.test(el[readyState]))) || loaded) {
         return;
       }
       el.onload = el[onreadystatechange] = null;
@@ -129,7 +129,7 @@
     };
     el.async = 1;
     el.src = path;
-    script.parentNode.insertBefore(el, script);
+    head.insertBefore(el, head.firstChild);
   }
 
   $script.get = create;
@@ -157,18 +157,15 @@
 
   (typeof module !== 'undefined' && module.exports) ?
     (module.exports = $script) :
-    (win.$script = $script);
+    (win['$script'] = $script);
 
 }(this, document, setTimeout);
-!function () {
-  var s = $script.noConflict();
-  $.ender({
-    script: s,
-    ready: s.ready,
-    require: s,
-    getScript: s.get
-  });
-}();
+ender.ender({
+  script: $script,
+  ready: $script.ready,
+  require: $script,
+  getScript: $script.get
+});
 !function () { var exports = {}, module = { exports: exports }; /*
     http://www.JSON.org/json2.js
     2011-02-23
@@ -650,7 +647,11 @@ if (!JSON) {
     }
 }());
 
-typeof module !== 'undefined' && module.exports && (module.exports = JSON); $.ender(module.exports); }();
+// shim IE<8 and FF buggy stringifier
+if (!this.JSON || typeof this.JSON.stringify !== 'function' || !~this.JSON.stringify({date:new Date(2011,4,11,11,47)},function(k,v){if(k==='date')return String('SERIALIZED');return v;}).indexOf('SERIALIZED')) {
+  this.JSON = JSON;
+}
+ $.ender(module.exports); }();
 !function () { var exports = {}, module = { exports: exports }; !function (doc) {
   var loaded = 0, fns = [], ol, f = false,
       testEl = doc.createElement('a'),
@@ -1010,6 +1011,8 @@ typeof module !== 'undefined' && module.exports && (module.exports = JSON); $.en
       query = null,
       byTag = 'getElementsByTagName',
       specialAttributes = /^checked|value|selected$/,
+      specialTags = /select|map|fieldset|table|tbody|tr|colgroup/i,
+      tagMap = { select: 'option', table: 'tbody', tr: 'td' },
       stateAttributes = /^checked|selected$/,
       ie = /msie/i.test(navigator.userAgent),
       uidList = [],
@@ -1177,11 +1180,21 @@ typeof module !== 'undefined' && module.exports && (module.exports = JSON); $.en
         html.textContent == null ?
           'innerText' :
           'textContent' :
-        'innerHTML';
+        'innerHTML', m;
+      function append(el, tag) {
+        while (el.firstChild) {
+          el.removeChild(el.firstChild);
+        }
+        each(normalize(h, tag), function (node) {
+          el.appendChild(node);
+        });
+      }
       return typeof h !== 'undefined' ?
-        this.each(function (el) {
-          el[method] = h;
-        }) :
+          this.each(function (el) {
+            (m = el.tagName.match(specialTags)) ?
+              append(el, m[0]) :
+              (el[method] = h);
+          }) :
         this[0] ? this[0][method] : '';
     },
 
@@ -1308,7 +1321,13 @@ typeof module !== 'undefined' && module.exports && (module.exports = JSON); $.en
 
     insertAfter: function (target, host) {
       return insert.call(this, target, host, function (t, el) {
-        t.parentNode.insertBefore(el, (t.nextSibling || t));
+        var sibling = t.nextSibling;
+        if (sibling) {
+          t.parentNode.insertBefore(el, sibling);
+        }
+        else {
+          t.parentNode.appendChild(el);
+        }
       });
     },
 
@@ -1442,8 +1461,8 @@ typeof module !== 'undefined' && module.exports && (module.exports = JSON); $.en
     }
   };
 
-  function normalize(node) {
-    return typeof node == 'string' ? bonzo.create(node) : is(node) ? [node] : node;
+  function normalize(node, tag) {
+    return typeof node == 'string' ? bonzo.create(node, tag) : is(node) ? [node] : node;
   }
 
   function scroll(x, y, type) {
@@ -1483,11 +1502,22 @@ typeof module !== 'undefined' && module.exports && (module.exports = JSON); $.en
     }
   };
 
-  bonzo.create = function (node) {
+  bonzo.create = function (node, tag) {
     return typeof node == 'string' ?
       function () {
-        var el = doc.createElement('div'), els = [];
-        el.innerHTML = node;
+        var t = tag ? tagMap[tag.toLowerCase()] : null;
+        var el = doc.createElement(t || 'div'), els = [];
+        if (tag) {
+          var bitches = node.match(new RegExp("<" + t + ">.+?<\\/" + t + ">", "g"));
+          each(bitches, function (m) {
+            m = m.replace(/<(.+)>(.+?)<\/\1>/, '$2');
+            var bah = doc.createElement(t);
+            bah.appendChild(doc.createDocumentFragment(m));
+            el.appendChild(bah);
+          });
+        } else {
+          el.innerHTML = node;
+        }
         var nodes = el.childNodes;
         el = el.firstChild;
         els.push(el);
@@ -3014,7 +3044,8 @@ function createContext() {
 	this.sendWithFunctions = function(msg) {
 		var self = this;
 		function replacer(k, v) {
-			if (_.isFunction(v)) {
+			// N.B. live remote functions no pasaran!
+			if (_.isFunction(v) && !v.live) {
 				v = THIS_IS_FUNC;
 			}
 			return v;
@@ -3022,6 +3053,33 @@ function createContext() {
 		var s = '~j~'+JSON.stringify(msg, replacer);
 		this.send(s);
 	}
+
+	//
+	// revive functions from THIS_IS_FUNC signatures
+	//
+	this.parseWithFunctions = function(obj) {
+		var context = this.context;
+		function revive(obj, root) {
+			// iterate over objects only
+			if (obj !== Object(obj)) return;
+			for (var prop in obj) if (has(obj, prop)) {
+				// glue the path
+				var path = root.concat([prop]);
+				// "function" signature is met?
+				if (obj[prop] === THIS_IS_FUNC) {
+					// bind RPC caller
+					obj[prop] = _.bind(context.rpc, context, path);
+					// mark function as live remote function
+					obj[prop].live = true;
+				// vanilla object
+				} else {
+					// recurse
+					revive(obj[prop], path);
+				}
+			}
+		}
+		revive(obj, []);
+	};
 
 	//
 	// send the reply to remote side
@@ -3127,6 +3185,10 @@ function createContext() {
 			fn.apply(this.context, message.params);
 		// remote context has changed
 		} else if (message.cmd === 'context') {
+			// optionally make remote functions real live functions
+			if (this.options.liveFunctions) {
+				this.parseWithFunctions(message.params[0]);
+			}
 			this.update.apply(this, message.params);
 			// fire 'ready' callback
 			if (CLIENT_SIDE && _.isFunction(this.context.ready)) {
