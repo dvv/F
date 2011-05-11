@@ -1,2 +1,0 @@
-#!/bin/sh
-exec ender -b jeesh scriptjs json4ender wscomm

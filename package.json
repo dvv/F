@@ -13,7 +13,8 @@
     "formidable": "",
     "mongodb": "",
     "emailjs": "",
-    "now": ""
+    "now": "",
+    "wscomm": ""
   },
   "lib"           : ".",
   "main"          : "index.js",
