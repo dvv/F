@@ -1,0 +1,20 @@
+--- index.js.orig	2011-04-22 00:44:23.000000000 -0400
++++ index.js	2011-04-22 00:50:14.000000000 -0400
+@@ -679,12 +679,16 @@
+         if (args.length === 1 && Array.isArray(args[0])) {
+             args = args[0];
+         }
+-        if (command === 'hmset' && typeof args[1] === 'object') {
++        if (command === 'hmset' && args[1] && typeof args[1] === 'object') {
+             obj = args.pop();
+             Object.keys(obj).forEach(function (key) {
++            	// we skip null props
++                if (obj[key] == null) return;
+                 args.push(key);
+                 args.push(obj[key]);
+             });
++            // we skip noop hmset to avoid errors
++            if (args.length < 3) return;
+         }
+         this.client.send_command(command, args, function (err, reply) {
+             if (err) {

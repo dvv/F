@@ -1,0 +1,18 @@
+DROP FUNCTION get_objects(INTEGER);
+DROP TYPE object;
+CREATE TYPE object as (id BIGINT, user_id BIGINT, path BIGINT[]);
+CREATE FUNCTION get_objects(INTEGER)
+RETURNS SETOF object AS '
+-- $1 - user access level
+WITH RECURSIVE obj_tree AS (
+  SELECT o.*, ARRAY[o.id] AS path
+    FROM objects o
+    WHERE o.ref_id IS NULL AND o.access <= $1
+  UNION ALL
+    SELECT t.*, tt.path || t.id AS path
+    FROM objects t
+    JOIN obj_tree tt ON t.ref_id = tt.id
+    WHERE t.access <= $1
+)
+SELECT id, user_id, path FROM obj_tree;
+' LANGUAGE 'SQL';

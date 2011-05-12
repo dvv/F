@@ -1,0 +1,3 @@
+#!/bin/sh
+
+node-fibers /usr/local/bin/coffee test.coffee
