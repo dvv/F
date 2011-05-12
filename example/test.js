@@ -71,7 +71,7 @@ var fallbackContext = function(context) {
 	config.routes = [
 		['GET', '/', function(req, res, next) {
 			//console.log('HERE', req.context);
-			res.render('index', fallbackContext(req.context));
+			res.render('index', req.context);//fallbackContext(req.context));
 		}],
 	];
 	//
@@ -86,15 +86,9 @@ var fallbackContext = function(context) {
 	//console.log('MIDDLE', middleware);
 
 	//
-	// setup now.js
+	// setup wscomm
 	//
-	var nowjs = F.now(config.security.getCapability, config);
-	//
-	/*extend(nowjs.client, {
-		act: function(s) {
-			this.now.flash(s);
-		}
-	});*/
+	var WSComm = F.wscomm(config.security.getCapability, config);
 
 	//
 	// run HTTP server
@@ -103,24 +97,15 @@ var fallbackContext = function(context) {
 		var http = require('http').createServer();
 		http.on('request', middleware);
 		http.listen(config.server.port);
-		var now_http = nowjs.initialize(http);
-		/*now_http.now.demo = function(callback) {
-			console.log('DEMOHTTP');
-		}
-		now_http.connected(function() {
-			//console.log("Joined: " + this.now);
+		// websocket
+		var ws = WSComm.listen(http, {
+			ready: function() {
+				// `this` is the socket; here is the only place to memo it
+				// setup initial context
+				this.context.extend(getContext.call(this));
+			}
 		});
-		now_http.disconnected(function() {
-			//console.log("Left: " + this.now);
-		});
-		_.extend(now_http.now, nowjs.client);*/
 	}
-	/*_.extend(now_http.now, {
-		act: function(s) {
-			console.log(this);
-			this.now.flash(s);
-		}
-	});*/
 
 	//
 	// reuse the middleware for HTTPS server
@@ -133,22 +118,14 @@ var fallbackContext = function(context) {
 		});
 		https.on('request', middleware);
 		https.listen(config.server.ssl.port);
-		var now_https = nowjs.initialize(https);
-		now_https.now.demo = function(callback) {
-			console.log('DEMOHTTPS');
-		}
-		_.extend(now_https.now, nowjs.client);
+		// websocket
+		var ws = WSComm.listen(https, {
+			ready: function() {
+				// `this` is the socket; here is the only place to memo it
+				// setup initial context
+				this.context.extend(getContext.call(this));
+			}
+		});
 	}
-
-	//
-	// compare to DNode
-	//
-	/*var DNode = require('dnode');
-	var dnode = DNode({
-		zing: function(n, cb) {
-			cb(n * 100)
-		}
-	});
-	dnode.listen(http);*/
 
 });
